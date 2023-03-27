@@ -1,71 +1,132 @@
 import sys
 import matplotlib.pyplot as plt
 import numpy as np
+import cv2 as cv
+
 
 sys.path.append("C:\\Users\\Miryam\\SLAM")
 
-import cv2 as cv
-
-# / cv2.AKAZE_create / cv2.SIFT_create , and many more…
-# detectAndCompute
 DATA_PATH = r'C:\\Users\\Miryam\\SLAM\\VAN_ex\\dataset\\sequences\\05\\'
+SIGNIFICANCE_TST_RATIO = 0.7
 
 
 def read_images(idx):
+    """
+    Get index of picture from the data set and read them
+    :param idx: index
+    :return: left and right cameras photos
+    """
     img_name = '{:06d}.png'.format(idx)
     img1 = cv.imread(DATA_PATH + 'image_0\\' + img_name, 0)
     img2 = cv.imread(DATA_PATH + 'image_1\\' + img_name, 0)
     return img1, img2
 
 
-def detect_and_compute(img):
+def detect_and_compute(img1, img2):
+    """
+    Call CV algorithms sift to detect and compute features in right and left pictures
+    :param img1:
+    :param img2:
+    :return: key points and descriptors for right & left images
+    """
     sift = cv.SIFT_create()
-    # gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-    return sift.detectAndCompute(img, None)
+    kp1, des1 = sift.detectAndCompute(img1, None)
+    kp2, des2 = sift.detectAndCompute(img2, None)
+    return kp1, des1, kp2, des2
 
 
-def present_kp(img, kp, img_num):
-    img = cv.drawKeypoints(img, kp, img)
-    cv.imwrite('siftKeyPoints{}.png'.format(img_num), img)
-    plt.imshow(img), plt.show()
+def show_key_points(img1, kp1, img2, kp2):
+    """
+    For each image (right & left), show the key points on the picture, and save the image with the kp as new image
+    :param img1:
+    :param kp1:
+    :param img2:
+    :param kp2:
+    :return: right and left images with the key points
+    """
+    img1 = cv.drawKeypoints(img1, kp1, img1)
+    img2 = cv.drawKeypoints(img2, kp2, img2)
+    cv.imwrite('keyPointsImg1.png', img1)
+    cv.imwrite('keyPointsImg2.png', img2)
+    plt.imshow(img1), plt.show()
+    plt.imshow(img2), plt.show()
+    return img1, img2
 
 
-def main():
+def find_matches(img1, kp1, des1, img2, kp2, des2):
+    """
+    Find, for each descriptor in the left image, the closest feature in the right image.
+    Present 20 random matches as lines connecting the key-point pixel location on the images pair. T
+    :param img1:
+    :param kp1:
+    :param des1:
+    :param img2:
+    :param kp2:
+    :param des2:
+    :return: new image with matches on it
+    """
+    bf = cv.BFMatcher(cv.NORM_L1, crossCheck=True)
+    matches = bf.match(des1, des2)
+    img_matches = cv.drawMatches(img1, kp1, img2, kp2, np.random.choice(matches, 20), img2, flags=2)
+    cv.imwrite('matches.png', img_matches)
+    plt.imshow(img_matches), plt.show()
+    return img_matches
+
+
+def significance_test(des1, des2, ratio):
+    """
+    Test the matches: reject all matches that the ratio between first match and second match is not closegi enough
+    :param img1:
+    :param kp1:
+    :param des1:
+    :param img2:
+    :param kp2:
+    :param des2:
+    :param ratio: ratio for the test
+    :return: best and fail matches after applying the test
+    """
+    bf = cv.BFMatcher()
+    matches = bf.knnMatch(des1, des2, k=2)
+    best_matches, fail_matches = [], []
+    for m1, m2 in matches:
+        if m1.distance < ratio * m2.distance:
+            best_matches.append([m1])
+        else:
+            fail_matches.append([m1])
+    return best_matches, fail_matches
+
+
+def draw_matches_signi_test(img1, img2, kp1, kp2, matches, output_name):
+    img_with_matches = cv.drawMatchesKnn(img1, kp1, img2, kp2,
+                                         np.asarray(matches)[np.random.randint(0, len(matches), 20), :], img2,
+                                         flags=2)
+    cv.imwrite(output_name, img_with_matches)
+    plt.imshow(img_with_matches), plt.show()
+
+
+def ex1_run():
     # 1.1 detect and extract key points
     img1, img2 = read_images(0)
-    kp1, des1 = detect_and_compute(img1)
-    kp2, des2 = detect_and_compute(img2)
-
-    # present key point
-    present_kp(img1, kp1, 1)
-    present_kp(img2, kp2, 2)
-
+    kp1, des1, kp2, des2 = detect_and_compute(img1, img2)
+    show_key_points(img1, kp1, img2, kp2)
 
     # 1.2 print two first descriptors
     print("Descriptors of two first features: ")
     print("img1: ", des1[0], '\n', des1[1])
     print("img2: ", des2[0], '\n', des1[2])
 
-    # 1.3
-    bf = cv.BFMatcher(cv.NORM_L1, crossCheck=True)
-    matches = bf.match(des1, des2)
+    # 1.3 match the two descriptors list
+    find_matches(img1, kp1, des1, img2, kp2, des2)
 
-    img3 = cv.drawMatches(img1, kp1, img2, kp2, np.random.choice(matches, 20), img2, flags=2)
-    cv.imwrite('matches.png', img3)
-    plt.imshow(img3), plt.show()
+    # 1.4 use significance test to reject matches
+    best_matches, fail_matches = significance_test(des1, des2, SIGNIFICANCE_TST_RATIO)
+    draw_matches_signi_test(img1, img2, kp1, kp2, best_matches, 'best_matches.png')
 
-    bf = cv.BFMatcher()
-    matches = bf.knnMatch(des1, des2, k=2)
-    best_matches, fail_matches = [], []
-    ratio = 0.75
-    for m1, m2 in matches:
-        if m1.distance < ratio * m2.distance:
-            best_matches.append([m1])
-        else:
-            fail_matches.append([m1])
+    # how many matches were discarded?
+    print("The number of discarded matches after applying significance test is: ", len(fail_matches))
 
-    img3 = cv.drawMatchesKnn(img1, kp1, img2, kp2, np.asarray(best_matches)[np.random.randint(0, len(best_matches), 20), :], img2, flags=2)
-    cv.imwrite('best_matches.png', img3)
-    plt.imshow(img3), plt.show()
+    # draw fail matches (to find correct match that failed the significance test)
+    draw_matches_signi_test(img1, img2, kp1, kp2, fail_matches, 'fail_matches.png')
 
-main()
+
+ex1_run()
