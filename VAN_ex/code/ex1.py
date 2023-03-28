@@ -70,7 +70,7 @@ def find_matches(img1, kp1, des1, img2, kp2, des2):
     img_matches = cv.drawMatches(img1, kp1, img2, kp2, np.random.choice(matches, 20), img2, flags=2)
     cv.imwrite('matches.png', img_matches)
     plt.imshow(img_matches), plt.show()
-    return img_matches
+    return matches
 
 
 def significance_test(des1, des2, ratio):
@@ -116,7 +116,7 @@ def ex1_run():
     print("img2: ", des2[0], '\n', des1[2])
 
     # 1.3 match the two descriptors list
-    find_matches(img1, kp1, des1, img2, kp2, des2)
+    matches = find_matches(img1, kp1, des1, img2, kp2, des2)
 
     # 1.4 use significance test to reject matches
     best_matches, fail_matches = significance_test(des1, des2, SIGNIFICANCE_TST_RATIO)
