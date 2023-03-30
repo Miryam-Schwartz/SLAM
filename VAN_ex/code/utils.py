@@ -44,9 +44,6 @@ def find_matches(img1, kp1, des1, img2, kp2, des2):
     """
     bf = cv.BFMatcher(cv.NORM_L1, crossCheck=True)
     matches = bf.match(des1, des2)
-    img_matches = cv.drawMatches(img1, kp1, img2, kp2, np.random.choice(matches, 20), img2, flags=2)
-    cv.imwrite('matches.png', img_matches)
-    plt.imshow(img_matches), plt.show()
     return matches
 
 
