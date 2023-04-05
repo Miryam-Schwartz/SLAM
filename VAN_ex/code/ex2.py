@@ -19,8 +19,8 @@ def get_correlated_kps_from_matches(kp1, kp2, matches):
     :param kp1: list of key-points of left image
     :param kp2: list of key-points of right image
     :param matches: list of matches between right and left image
-    :return: 2 lists of key-points, for right and left left images,
-    when, i keypoint in kp1, corresponding to i keypoint in kp2.
+    :return: 2 lists of key-points, for right and left images,
+    when, the i-th keypoint in kp1, corresponding to the i-th keypoint in kp2.
     Elements type of kp1 and kp2 is KeyPoint.
     """
     kp1_ret, kp2_ret = [], []
@@ -218,7 +218,7 @@ def ex2_run():
 
     # repeat the triangulation using ‘cv2.triangulatePoints’
     cv_dots_3d = triangulation_list_of_points(kp1, kp2, cv.triangulatePoints)
-    show_dots_3d_cloud(our_dots_3d, f"{OUTPUT_DIR}cv_3D_points_cloud_img0.html")
+    show_dots_3d_cloud(cv_dots_3d, f"{OUTPUT_DIR}cv_3D_points_cloud_img0.html")
 
     # print the median distance between the corresponding 3d points in our implementation,
     # compare to opencv implementation
@@ -230,6 +230,10 @@ def ex2_run():
     for i in [500, 1000, 1500, 2000, 2500]:
         dots_3d = match_and_triangulate_image(i, triangulation_single_match)
         show_dots_3d_cloud(dots_3d, f"{OUTPUT_DIR}our_3D_points_cloud_img{i}.html")
+
+    # image 0 point cloud with rectified test
+    our_dots_rect_tst = triangulation_list_of_points(img1_inliers, img2_inliers, triangulation_single_match)
+    show_dots_3d_cloud(our_dots_rect_tst, f"{OUTPUT_DIR}our_3D_points_cloud_img0_rectified_test.html")
 
 
 ex2_run()
