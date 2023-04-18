@@ -179,7 +179,7 @@ def match_and_triangulate_image(im_idx, triangulation_func, rectified_test=False
     """
     img1, img2 = utils.read_images(im_idx)
     kp1, des1, kp2, des2 = utils.detect_and_compute(img1, img2)
-    matches = utils.find_matches(img1, kp1, des1, img2, kp2, des2)
+    matches = utils.find_matches(des1, des2)
     kp1, kp2 = get_correlated_kps_from_matches(kp1, kp2, matches)
     if rectified_test:
         kp1, _, kp2, _ = rectified_stereo_pattern_test(kp1, kp2, THRESHOLD)
@@ -192,7 +192,7 @@ def ex2_run():
     # of rectified stereo images for all the matches.
     img1, img2 = utils.read_images(0)
     kp1, des1, kp2, des2 = utils.detect_and_compute(img1, img2)
-    matches = utils.find_matches(img1, kp1, des1, img2, kp2, des2)
+    matches = utils.find_matches(des1, des2)
     kp1, kp2 = get_correlated_kps_from_matches(kp1, kp2, matches)
 
     deviation = deviation_from_pattern(kp1, kp2)
