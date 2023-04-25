@@ -134,6 +134,7 @@ def triangulation_list_of_points(kp1, kp2, triangulation_func=triangulation_sing
         ret_pt_4d = triangulation_func(k @ m1, k @ m2, p, q)
         ret_pt_3d = ret_pt_4d[:3] / ret_pt_4d[3]
         dots_3d[kp1[i]] = ret_pt_3d
+        dots_3d[kp2[i]] = ret_pt_3d
     return dots_3d
 
 
@@ -160,9 +161,11 @@ def match_and_triangulate_image(im_idx, triangulation_func=triangulation_single_
 def get_correlated_kps_and_des_from_matches(kp1, des1, kp2, des2, matches):
     kp1_ret, kp2_ret = [], []
     des1_ret, des2_ret = [], []
+    dict_left_to_right = dict()
     for i, match in enumerate(matches):
         kp1_ret.append(kp1[match.queryIdx])
         kp2_ret.append(kp2[match.trainIdx])
         des1_ret.append(des1[match.queryIdx])
         des2_ret.append(des2[match.trainIdx])
-    return kp1_ret, des1_ret, kp2_ret, des2_ret
+        dict_left_to_right[kp1[match.queryIdx]] = kp2[match.trainIdx]
+    return kp1_ret, des1_ret, kp2_ret, des2_ret, dict_left_to_right
