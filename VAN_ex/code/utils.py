@@ -1,6 +1,8 @@
 import cv2 as cv
 import numpy as np
 from matplotlib import pyplot as plt
+import plotly.graph_objs as go
+
 
 DATA_PATH = r'C:\\Users\\Miryam\\SLAM\\VAN_ex\\dataset\\sequences\\05\\'
 
@@ -169,3 +171,17 @@ def get_correlated_kps_and_des_from_matches(kp1, des1, kp2, des2, matches):
         des2_ret.append(des2[match.trainIdx])
         dict_left_to_right[kp1[match.queryIdx]] = kp2[match.trainIdx]
     return kp1_ret, des1_ret, kp2_ret, des2_ret, dict_left_to_right
+
+
+def show_dots_3d_cloud(arrays_of_dots_3d, names_of_arrays, colors, output_name, show=False):
+    fig = go.Figure(go.Scatter3d(x=[0], y=[0], z=[0], mode='markers', marker=dict(size=5, color='yellow'), name='camera'))
+    for i in range(len(arrays_of_dots_3d)):
+        dots_3d = np.array(arrays_of_dots_3d[i])
+        x = dots_3d[:, 0].reshape(-1)
+        y = dots_3d[:, 1].reshape(-1)
+        z = dots_3d[:, 2].reshape(-1)
+        trace = go.Scatter3d(x=x, y=y, z=z, mode='markers', marker=dict(size=3, color=colors[i]), name=names_of_arrays[i])
+        fig.add_trace(trace)
+    if show:
+        fig.show()
+    fig.write_html(output_name)

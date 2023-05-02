@@ -15,6 +15,95 @@ def project_3d_pt_to_pixel(k, extrinsic_camera_mat, pt_3d):
     return projected[0:2] / projected[2]
 
 
+def estimate_frame1_mats_pnp(extrinsic_camera_mat_right0, k, points_2d, points_3d, flag=cv.SOLVEPNP_P3P):
+    dist_coeffs = np.zeros((4, 1))
+    success, rotation_vector, translation_vector = cv.solvePnP(points_3d, points_2d, k, dist_coeffs,
+                                                               flags=flag)
+    r_mat, _ = cv.Rodrigues(rotation_vector)
+    extrinsic_camera_mat_left1 = np.hstack((r_mat, translation_vector))
+    extrinsic_camera_mat_right1 = np.array(extrinsic_camera_mat_left1, copy=True)
+    extrinsic_camera_mat_right1[0][3] += extrinsic_camera_mat_right0[0][3]
+    return extrinsic_camera_mat_left1, extrinsic_camera_mat_right1, r_mat, translation_vector
+
+
+def sample_4_points(kp0_left_l, kp1_left_l, points_cloud_0):
+    rand_idxs = random.sample(range(len(kp1_left_l) - 1), 4)
+    # print(rand_idxs)
+    points_3d = np.zeros((4, 3))
+    points_2d = np.zeros((4, 2))
+    for i in range(4):
+        points_3d[i] = points_cloud_0[kp0_left_l[rand_idxs[i]]]
+        points_2d[i] = kp1_left_l[rand_idxs[i]].pt
+    return points_2d, points_3d
+
+
+def find_supporters \
+                (kp0_left_l, kp1_left_l, points_cloud_0, k, extrinsic_camera_mat_left1, extrinsic_camera_mat_right1,
+                 dict_matches1, is_find_unsupported=False):
+    supporter_left0, supporter_left1 = [], []
+    unsupporter_left0, unsupporter_left1 = [], []
+    for i in range(len(kp1_left_l)):
+        pt_3d = points_cloud_0[kp0_left_l[i]]
+        p_left1 = project_3d_pt_to_pixel(k, extrinsic_camera_mat_left1, pt_3d)
+        real_p_left1 = kp1_left_l[i].pt
+        p_right1 = project_3d_pt_to_pixel(k, extrinsic_camera_mat_right1, pt_3d)
+        real_p_right1 = dict_matches1[kp1_left_l[i]].pt
+        if np.linalg.norm(real_p_left1 - p_left1) <= 2 and np.linalg.norm(real_p_right1 - p_right1) <= 2:
+            supporter_left0.append(kp0_left_l[i])
+            supporter_left1.append(kp1_left_l[i])
+        elif is_find_unsupported:
+            unsupporter_left0.append(kp0_left_l[i])
+            unsupporter_left1.append(kp1_left_l[i])
+    return supporter_left0, supporter_left1, unsupporter_left0, unsupporter_left1
+
+
+def calc_max_iterations(p, eps, size):
+    return np.log(1 - p) / np.log(1 - np.power(1 - eps, size))
+
+
+def RANSAC(kp0_left_l, kp1_left_l, points_cloud_0, extrinsic_camera_mat_right0, k, dict_matches1, dict_matches0_1_left):
+    p, eps = 0.99, 0.99  # eps = prob to be outlier
+    i = 0
+    size = len(kp0_left_l)
+    print(size)
+    max_supporters_num = 0
+    max_supporters_left0 = None
+    while eps > 0 and i < calc_max_iterations(p, eps, 4):
+        print(i)
+        points_2d, points_3d = sample_4_points(kp0_left_l, kp1_left_l, points_cloud_0)
+        extrinsic_camera_mat_left1, extrinsic_camera_mat_right1, r_mat, translation_vector = \
+            estimate_frame1_mats_pnp(extrinsic_camera_mat_right0, k, points_2d, points_3d)
+        supporter_left0, supporter_left1, _, _ = find_supporters(kp0_left_l, kp1_left_l, points_cloud_0, k,
+                                                                 extrinsic_camera_mat_left1,
+                                                                 extrinsic_camera_mat_right1,
+                                                                 dict_matches1)
+        supporters_num = len(supporter_left0)
+        if supporters_num > max_supporters_num:
+            max_supporters_num = supporters_num
+            max_supporters_left0 = supporter_left0
+
+        # update eps
+        eps = (size - max_supporters_num) / size
+        i += 1
+
+    points_3d_supporters = np.zeros((max_supporters_num, 3))
+    points_2d_supporters = np.zeros((max_supporters_num, 2))
+    print(max_supporters_num)
+    for i in range(max_supporters_num):
+        points_3d_supporters[i] = points_cloud_0[max_supporters_left0[i]]
+        points_2d_supporters[i] = dict_matches0_1_left[max_supporters_left0[i]].pt
+    extrinsic_camera_mat_left1, extrinsic_camera_mat_right1, r_mat, translation_vector = \
+        estimate_frame1_mats_pnp(extrinsic_camera_mat_right0, k,
+                                 points_2d_supporters, points_3d_supporters, flag=cv.SOLVEPNP_ITERATIVE)
+    supporter_left0, supporter_left1, unsupporter_left0, unsupporter_left1 = \
+        find_supporters(kp0_left_l, kp1_left_l, points_cloud_0, k,
+                        extrinsic_camera_mat_left1,
+                        extrinsic_camera_mat_right1,
+                        dict_matches1)
+    return extrinsic_camera_mat_left1, extrinsic_camera_mat_right1,\
+        supporter_left0, supporter_left1, unsupporter_left0, unsupporter_left1
+
+
 def ex3_run():
     # 3.1
     img0_left, img0_right = utils.read_images(0)
@@ -47,28 +136,14 @@ def ex3_run():
     random.seed(4)
     kp0_left_l, des0_left_l, kp1_left_l, des1_left_l, dict_matches0_1_left = utils.get_correlated_kps_and_des_from_matches(
         kp0_left, des0_left, kp1_left, des1_left, matches_0_1_left)
-    rand_idxs = random.sample(range(len(kp1_left_l) - 1), 4)
-    # print(rand_idxs)
-    points_3d = np.zeros((4, 3))
-    points_2d = np.zeros((4, 2))
-    for i in range(4):
-        points_3d[i] = points_cloud_0[kp0_left_l[rand_idxs[i]]]
-        points_2d[i] = kp1_left_l[rand_idxs[i]].pt
+    points_2d, points_3d = sample_4_points(kp0_left_l, kp1_left_l, points_cloud_0)
     k, extrinsic_camera_mat_left0, extrinsic_camera_mat_right0 = utils.read_cameras()
-    dist_coeffs = np.zeros((4, 1))
-    success, rotation_vector, translation_vector = cv.solvePnP(points_3d, points_2d, k, dist_coeffs,
-                                                               flags=cv.SOLVEPNP_P3P)
-    r_mat, _ = cv.Rodrigues(rotation_vector)
-    extrinsic_camera_mat_left1 = np.hstack((r_mat, translation_vector))
-    extrinsic_camera_mat_right1 = np.array(extrinsic_camera_mat_left1, copy=True)
-    extrinsic_camera_mat_right1[0][3] += extrinsic_camera_mat_right0[0][3]
-    print("extrinsic_camera_mat_left0:\n", extrinsic_camera_mat_left0)
-    print("extrinsic_camera_mat_right0:\n", extrinsic_camera_mat_right0)
-    print("extrinsic_camera_mat_left1:\n", extrinsic_camera_mat_left1)
-    print("extrinsic_camera_mat_right1:\n", extrinsic_camera_mat_right1)
-
-    # another way to find extrinsic_camera_mat_right1
-    # todo
+    extrinsic_camera_mat_left1, extrinsic_camera_mat_right1, r_mat, translation_vector = estimate_frame1_mats_pnp(
+        extrinsic_camera_mat_right0, k, points_2d, points_3d)
+    # print("extrinsic_camera_mat_left0:\n", extrinsic_camera_mat_left0)
+    # print("extrinsic_camera_mat_right0:\n", extrinsic_camera_mat_right0)
+    # print("extrinsic_camera_mat_left1:\n", extrinsic_camera_mat_left1)
+    # print("extrinsic_camera_mat_right1:\n", extrinsic_camera_mat_right1)
 
     left0_pos = [0, 0, 0]
     right0_pos = -extrinsic_camera_mat_right0[:, 3]
@@ -107,9 +182,9 @@ def ex3_run():
         p_right1 = project_3d_pt_to_pixel(k, extrinsic_camera_mat_right1, pt_3d)
         real_p_right1 = dict_matches1[kp1_left_l[i]].pt
         if (
-                np.linalg.norm(real_p_left0 - p_left0) <= 2 and np.linalg.norm(real_p_right0 - p_right0) <= 2 and
+                # np.linalg.norm(real_p_left0 - p_left0) <= 2 and np.linalg.norm(real_p_right0 - p_right0) <= 2 and
                 np.linalg.norm(real_p_left1 - p_left1) <= 2 and np.linalg.norm(real_p_right1 - p_right1) <= 2
-                ):
+        ):
             supporter_left0.append(kp0_left_l[i])
             supporter_left1.append(kp1_left_l[i])
         else:
@@ -126,6 +201,36 @@ def ex3_run():
     cv.imwrite(f'img1_left_supporters.png', img1_left)
     plt.imshow(img1_left), plt.show()
 
+    # 3.5
+    extrinsic_camera_mat_left1, extrinsic_camera_mat_right1, \
+        supporter_left0, supporter_left1, unsupporter_left0, unsupporter_left1 =\
+     RANSAC(kp0_left_l, kp1_left_l, points_cloud_0, extrinsic_camera_mat_right0, k, dict_matches1, dict_matches0_1_left)
 
+    print("extrinsic_camera_mat_left0:\n", extrinsic_camera_mat_left0)
+    print("extrinsic_camera_mat_right0:\n", extrinsic_camera_mat_right0)
+    print("extrinsic_camera_mat_left1:\n", extrinsic_camera_mat_left1)
+    print("extrinsic_camera_mat_right1:\n", extrinsic_camera_mat_right1)
+
+    R, t = extrinsic_camera_mat_left1[:,:3], extrinsic_camera_mat_left1[:,3]
+    estimated_3d_point_frame1 = np.zeros((len(points_cloud_0), 3))
+    pts_cloud_frame0 = list(points_cloud_0.values())
+    pt_len = len(pts_cloud_frame0)
+    for i in range(pt_len):
+        estimated_3d_point_frame1[i] = R @ pts_cloud_frame0[i] + t
+
+    utils.show_dots_3d_cloud([estimated_3d_point_frame1, list(points_cloud_1.values())],
+                             ['points from frame 1 (after triangulation)', 'points from frame 0 (after transformation T'],
+                             ['blue', 'red'],
+                             '3d_point_cloud_frame1 triangulation vs transformation.html')
+
+    img0_left = cv.drawKeypoints(img0_left, supporter_left0, img0_left, color=(46, 139, 87))
+    img0_left = cv.drawKeypoints(img0_left, unsupporter_left0, img0_left, color=(0, 0, 128))
+    cv.imwrite(f'img0_left_supporters_after_ransac.png', img0_left)
+    plt.imshow(img0_left), plt.show()
+
+    img1_left = cv.drawKeypoints(img1_left, supporter_left1, img1_left, color=(46, 139, 87))
+    img1_left = cv.drawKeypoints(img1_left, unsupporter_left1, img1_left, color=(0, 0, 128))
+    cv.imwrite(f'img1_left_supporters_after_ransac.png', img1_left)
+    plt.imshow(img1_left), plt.show()
 
 ex3_run()
