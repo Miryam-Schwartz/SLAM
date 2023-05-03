@@ -5,6 +5,7 @@ import numpy as np
 import plotly.graph_objs as go
 from cv2 import SOLVEPNP_P3P
 from matplotlib import pyplot as plt
+import plotly.express as px
 
 import utils
 
@@ -68,11 +69,11 @@ def RANSAC(kp0_left_l, kp1_left_l, points_cloud_0, dict_matches1, dict_matches0_
     p, eps = 0.99, 0.99  # eps = prob to be outlier
     i = 0
     size = len(kp0_left_l)
-    print(size)
+    print("sample_size ", size)
     max_supporters_num = 0
     max_supporters_left0 = None
     while eps > 0 and i < calc_max_iterations(p, eps, 4):
-        print(i)
+        print("RANSAC iteration:", i)
         points_2d, points_3d = sample_4_points(kp0_left_l, kp1_left_l, points_cloud_0)
         extrinsic_camera_mat_left1, extrinsic_camera_mat_right1, r_mat, translation_vector = \
             estimate_frame1_mats_pnp(points_2d, points_3d)
@@ -87,11 +88,12 @@ def RANSAC(kp0_left_l, kp1_left_l, points_cloud_0, dict_matches1, dict_matches0_
 
         # update eps
         eps = (size - max_supporters_num) / size
+        print(f'epsilon: {eps}, cur num sup: {supporters_num}, max num sup: {max_supporters_num}')
         i += 1
 
     points_3d_supporters = np.zeros((max_supporters_num, 3))
     points_2d_supporters = np.zeros((max_supporters_num, 2))
-    print(max_supporters_num)
+    print("end RANSAC: max_supporters_num ", max_supporters_num)
     for i in range(max_supporters_num):
         points_3d_supporters[i] = points_cloud_0[max_supporters_left0[i]]
         points_2d_supporters[i] = dict_matches0_1_left[max_supporters_left0[i]].pt
@@ -113,6 +115,13 @@ def find_cam_location_and_concat_mats(prev_concat_r, prev_concat_t, cur_r, cur_t
     return concat_r, concat_t, left_cur_pos
 
 
+def transform_points_cloud(points_cloud_1, cur_r, cur_t):
+    transformed_points_cloud = dict()
+    for kp, pt_3d in points_cloud_1.items():
+        transformed_points_cloud[kp] = cur_r @ pt_3d + cur_t
+    return transformed_points_cloud
+
+
 def localization_two_frames(idx_frame0, kp0_left, des0_left, points_cloud_0, prev_concat_r, prev_concat_t):
     des1_left, des1_right, dict_matches1, kp1_left, kp1_right, points_cloud_1 = read_frame_match_triangulate(
         idx_frame0 + 1)
@@ -124,6 +133,7 @@ def localization_two_frames(idx_frame0, kp0_left, des0_left, points_cloud_0, pre
                dict_matches0_1_left)
     concat_r, concat_t, left_cur_pos = find_cam_location_and_concat_mats \
         (prev_concat_r, prev_concat_t, extrinsic_camera_mat_left1[:, :3], extrinsic_camera_mat_left1[:, 3])
+    points_cloud_1 = transform_points_cloud(points_cloud_1, extrinsic_camera_mat_left1[:, :3], extrinsic_camera_mat_left1[:, 3])
     return kp1_left, des1_left, points_cloud_1, concat_r, concat_t, left_cur_pos
 
 
@@ -191,10 +201,10 @@ def ex3_run():
     right0_pos = -extrinsic_camera_mat_right0[:, 3]
     left1_pos = ((-np.linalg.inv(r_mat) @ translation_vector).reshape(1, 3))[0]
     right1_pos = -np.linalg.inv(extrinsic_camera_mat_right1[:, 0:3]) @ (extrinsic_camera_mat_right1[:, 3])
-    print("left0 camera position: ", left0_pos)
-    print("right0 camera position: ", right0_pos)
-    print("left1 camera position: ", left1_pos)
-    print("right1 camera position: ", right1_pos)
+    # print("left0 camera position: ", left0_pos)
+    # print("right0 camera position: ", right0_pos)
+    # print("left1 camera position: ", left1_pos)
+    # print("right1 camera position: ", right1_pos)
 
     # plot relative position of the four cameras
 
@@ -244,50 +254,58 @@ def ex3_run():
     plt.imshow(img1_left), plt.show()
 
     # 3.5
-    extrinsic_camera_mat_left1, \
-        supporter_left0, supporter_left1, unsupporter_left0, unsupporter_left1 = \
-        RANSAC(kp0_left_l, kp1_left_l, points_cloud_0, dict_matches1, dict_matches0_1_left)
+    # extrinsic_camera_mat_left1, \
+    #     supporter_left0, supporter_left1, unsupporter_left0, unsupporter_left1 = \
+    #     RANSAC(kp0_left_l, kp1_left_l, points_cloud_0, dict_matches1, dict_matches0_1_left)
 
     # print("extrinsic_camera_mat_left0:\n", extrinsic_camera_mat_left0)
     # print("extrinsic_camera_mat_right0:\n", extrinsic_camera_mat_right0)
-    print("extrinsic_camera_mat_left1:\n", extrinsic_camera_mat_left1)
+    # print("extrinsic_camera_mat_left1:\n", extrinsic_camera_mat_left1)
     # print("extrinsic_camera_mat_right1:\n", extrinsic_camera_mat_right1)
 
-    R, t = extrinsic_camera_mat_left1[:, :3], extrinsic_camera_mat_left1[:, 3]
-    estimated_3d_point_frame1 = np.zeros((len(points_cloud_0), 3))
-    pts_cloud_frame0 = list(points_cloud_0.values())
-    pt_len = len(pts_cloud_frame0)
-    for i in range(pt_len):
-        estimated_3d_point_frame1[i] = R @ pts_cloud_frame0[i] + t
-
-    utils.show_dots_3d_cloud([estimated_3d_point_frame1, list(points_cloud_1.values())],
-                             ['points from frame 1 (after triangulation)',
-                              'points from frame 0 (after transformation T'],
-                             ['blue', 'red'],
-                             '3d_point_cloud_frame1 triangulation vs transformation.html')
-
-    img0_left = cv.drawKeypoints(img0_left, supporter_left0, img0_left, color=(46, 139, 87))
-    img0_left = cv.drawKeypoints(img0_left, unsupporter_left0, img0_left, color=(0, 0, 128))
-    cv.imwrite(f'img0_left_supporters_after_ransac.png', img0_left)
-    plt.imshow(img0_left), plt.show()
-
-    img1_left = cv.drawKeypoints(img1_left, supporter_left1, img1_left, color=(46, 139, 87))
-    img1_left = cv.drawKeypoints(img1_left, unsupporter_left1, img1_left, color=(0, 0, 128))
-    cv.imwrite(f'img1_left_supporters_after_ransac.png', img1_left)
-    plt.imshow(img1_left), plt.show()
+    # R, t = extrinsic_camera_mat_left1[:, :3], extrinsic_camera_mat_left1[:, 3]
+    # estimated_3d_point_frame1 = np.zeros((len(points_cloud_0), 3))
+    # pts_cloud_frame0 = list(points_cloud_0.values())
+    # pt_len = len(pts_cloud_frame0)
+    # for i in range(pt_len):
+    #     estimated_3d_point_frame1[i] = R @ pts_cloud_frame0[i] + t
+    #
+    # utils.show_dots_3d_cloud([estimated_3d_point_frame1, list(points_cloud_1.values())],
+    #                          ['points from frame 1 (after triangulation)',
+    #                           'points from frame 0 (after transformation T'],
+    #                          ['blue', 'red'],
+    #                          '3d_point_cloud_frame1 triangulation vs transformation.html')
+    #
+    # img0_left = cv.drawKeypoints(img0_left, supporter_left0, img0_left, color=(46, 139, 87))
+    # img0_left = cv.drawKeypoints(img0_left, unsupporter_left0, img0_left, color=(0, 0, 128))
+    # cv.imwrite(f'img0_left_supporters_after_ransac.png', img0_left)
+    # plt.imshow(img0_left), plt.show()
+    #
+    # img1_left = cv.drawKeypoints(img1_left, supporter_left1, img1_left, color=(46, 139, 87))
+    # img1_left = cv.drawKeypoints(img1_left, unsupporter_left1, img1_left, color=(0, 0, 128))
+    # cv.imwrite(f'img1_left_supporters_after_ransac.png', img1_left)
+    # plt.imshow(img1_left), plt.show()
 
     # 3.6
-    kp1_left, des1_left, points_cloud_1, concat_r, concat_t, left_cur_pos =\
-        localization_two_frames(0, kp0_left, des0_left, points_cloud_0, extrinsic_camera_mat_left0[:, :3], extrinsic_camera_mat_left0[:,3])
-    print(concat_r)
-    print(concat_t)
-    print("new left cur_pos ", left_cur_pos)
+    #kp1_left, des1_left, points_cloud_1, concat_r, concat_t, left_cur_pos =\
+    #    localization_two_frames(0, kp0_left, des0_left, points_cloud_0, extrinsic_camera_mat_left0[:, :3], extrinsic_camera_mat_left0[:,3])
     left_cam_poses = []
     concat_r, concat_t = extrinsic_camera_mat_left0[:, :3], extrinsic_camera_mat_left0[:, 3]
-    for i in range(100):
+    for i in range(5):
+        print(f'---- frame iteration{i}----')
         kp1_left, des1_left, points_cloud_1, concat_r, concat_t, left_cur_pos = \
             localization_two_frames(i, kp0_left, des0_left, points_cloud_0, concat_r, concat_t)
         left_cam_poses.append(left_cur_pos)
         kp0_left, des0_left, points_cloud_0 = kp1_left, des1_left, points_cloud_1
+
+
+    left_cam_poses = np.array(left_cam_poses)
+    x = left_cam_poses[:, 0]
+    z = left_cam_poses[:, 2]
+    plt.scatter(x=x, y=z)
+    plt.title('Localization of kitty left camera from frames')
+    plt.xlabel('x')
+    plt.ylabel('z')
+    plt.savefig("localization.png")
 
 ex3_run()
