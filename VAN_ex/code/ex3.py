@@ -8,21 +8,24 @@ from matplotlib import pyplot as plt
 
 import utils
 
+INDENTATION_RIGHT_CAM_MAT = None
+K = None
 
-def project_3d_pt_to_pixel(k, extrinsic_camera_mat, pt_3d):
+
+def project_3d_pt_to_pixel(extrinsic_camera_mat, pt_3d):
     pt_3d_h = np.append(pt_3d, [1])
-    projected = k @ extrinsic_camera_mat @ pt_3d_h
+    projected = K @ extrinsic_camera_mat @ pt_3d_h
     return projected[0:2] / projected[2]
 
 
-def estimate_frame1_mats_pnp(extrinsic_camera_mat_right0, k, points_2d, points_3d, flag=cv.SOLVEPNP_P3P):
+def estimate_frame1_mats_pnp(points_2d, points_3d, flag=cv.SOLVEPNP_P3P):
     dist_coeffs = np.zeros((4, 1))
-    success, rotation_vector, translation_vector = cv.solvePnP(points_3d, points_2d, k, dist_coeffs,
+    success, rotation_vector, translation_vector = cv.solvePnP(points_3d, points_2d, K, dist_coeffs,
                                                                flags=flag)
     r_mat, _ = cv.Rodrigues(rotation_vector)
     extrinsic_camera_mat_left1 = np.hstack((r_mat, translation_vector))
     extrinsic_camera_mat_right1 = np.array(extrinsic_camera_mat_left1, copy=True)
-    extrinsic_camera_mat_right1[0][3] += extrinsic_camera_mat_right0[0][3]
+    extrinsic_camera_mat_right1[0][3] += INDENTATION_RIGHT_CAM_MAT
     return extrinsic_camera_mat_left1, extrinsic_camera_mat_right1, r_mat, translation_vector
 
 
@@ -38,15 +41,15 @@ def sample_4_points(kp0_left_l, kp1_left_l, points_cloud_0):
 
 
 def find_supporters \
-                (kp0_left_l, kp1_left_l, points_cloud_0, k, extrinsic_camera_mat_left1, extrinsic_camera_mat_right1,
+                (kp0_left_l, kp1_left_l, points_cloud_0, extrinsic_camera_mat_left1, extrinsic_camera_mat_right1,
                  dict_matches1, is_find_unsupported=False):
     supporter_left0, supporter_left1 = [], []
     unsupporter_left0, unsupporter_left1 = [], []
     for i in range(len(kp1_left_l)):
         pt_3d = points_cloud_0[kp0_left_l[i]]
-        p_left1 = project_3d_pt_to_pixel(k, extrinsic_camera_mat_left1, pt_3d)
+        p_left1 = project_3d_pt_to_pixel(extrinsic_camera_mat_left1, pt_3d)
         real_p_left1 = kp1_left_l[i].pt
-        p_right1 = project_3d_pt_to_pixel(k, extrinsic_camera_mat_right1, pt_3d)
+        p_right1 = project_3d_pt_to_pixel(extrinsic_camera_mat_right1, pt_3d)
         real_p_right1 = dict_matches1[kp1_left_l[i]].pt
         if np.linalg.norm(real_p_left1 - p_left1) <= 2 and np.linalg.norm(real_p_right1 - p_right1) <= 2:
             supporter_left0.append(kp0_left_l[i])
@@ -61,7 +64,7 @@ def calc_max_iterations(p, eps, size):
     return np.log(1 - p) / np.log(1 - np.power(1 - eps, size))
 
 
-def RANSAC(kp0_left_l, kp1_left_l, points_cloud_0, extrinsic_camera_mat_right0, k, dict_matches1, dict_matches0_1_left):
+def RANSAC(kp0_left_l, kp1_left_l, points_cloud_0, dict_matches1, dict_matches0_1_left):
     p, eps = 0.99, 0.99  # eps = prob to be outlier
     i = 0
     size = len(kp0_left_l)
@@ -72,8 +75,8 @@ def RANSAC(kp0_left_l, kp1_left_l, points_cloud_0, extrinsic_camera_mat_right0, 
         print(i)
         points_2d, points_3d = sample_4_points(kp0_left_l, kp1_left_l, points_cloud_0)
         extrinsic_camera_mat_left1, extrinsic_camera_mat_right1, r_mat, translation_vector = \
-            estimate_frame1_mats_pnp(extrinsic_camera_mat_right0, k, points_2d, points_3d)
-        supporter_left0, supporter_left1, _, _ = find_supporters(kp0_left_l, kp1_left_l, points_cloud_0, k,
+            estimate_frame1_mats_pnp(points_2d, points_3d)
+        supporter_left0, supporter_left1, _, _ = find_supporters(kp0_left_l, kp1_left_l, points_cloud_0,
                                                                  extrinsic_camera_mat_left1,
                                                                  extrinsic_camera_mat_right1,
                                                                  dict_matches1)
@@ -93,15 +96,51 @@ def RANSAC(kp0_left_l, kp1_left_l, points_cloud_0, extrinsic_camera_mat_right0, 
         points_3d_supporters[i] = points_cloud_0[max_supporters_left0[i]]
         points_2d_supporters[i] = dict_matches0_1_left[max_supporters_left0[i]].pt
     extrinsic_camera_mat_left1, extrinsic_camera_mat_right1, r_mat, translation_vector = \
-        estimate_frame1_mats_pnp(extrinsic_camera_mat_right0, k,
-                                 points_2d_supporters, points_3d_supporters, flag=cv.SOLVEPNP_ITERATIVE)
+        estimate_frame1_mats_pnp(points_2d_supporters, points_3d_supporters, flag=cv.SOLVEPNP_ITERATIVE)
     supporter_left0, supporter_left1, unsupporter_left0, unsupporter_left1 = \
-        find_supporters(kp0_left_l, kp1_left_l, points_cloud_0, k,
+        find_supporters(kp0_left_l, kp1_left_l, points_cloud_0,
                         extrinsic_camera_mat_left1,
                         extrinsic_camera_mat_right1,
                         dict_matches1)
-    return extrinsic_camera_mat_left1, extrinsic_camera_mat_right1,\
+    return extrinsic_camera_mat_left1, \
         supporter_left0, supporter_left1, unsupporter_left0, unsupporter_left1
+
+
+def find_cam_location_and_concat_mats(prev_concat_r, prev_concat_t, cur_r, cur_t):
+    concat_r = cur_r @ prev_concat_r
+    concat_t = cur_r @ prev_concat_t + cur_t
+    left_cur_pos = ((-np.linalg.inv(concat_r) @ concat_t).reshape(1, 3))[0]
+    return concat_r, concat_t, left_cur_pos
+
+
+def localization_two_frames(idx_frame0, kp0_left, des0_left, points_cloud_0, prev_concat_r, prev_concat_t):
+    des1_left, des1_right, dict_matches1, kp1_left, kp1_right, points_cloud_1 = read_frame_match_triangulate(
+        idx_frame0 + 1)
+    matches_0_1_left = utils.find_matches(np.array(des0_left), np.array(des1_left))
+    kp0_left_l, des0_left_l, kp1_left_l, des1_left_l, dict_matches0_1_left = utils.get_correlated_kps_and_des_from_matches(
+        kp0_left, des0_left, kp1_left, des1_left, matches_0_1_left)
+    extrinsic_camera_mat_left1, supporter_left0, supporter_left1, unsupporter_left0, unsupporter_left1 = \
+        RANSAC(kp0_left_l, kp1_left_l, points_cloud_0, dict_matches1,
+               dict_matches0_1_left)
+    concat_r, concat_t, left_cur_pos = find_cam_location_and_concat_mats \
+        (prev_concat_r, prev_concat_t, extrinsic_camera_mat_left1[:, :3], extrinsic_camera_mat_left1[:, 3])
+    return kp1_left, des1_left, points_cloud_1, concat_r, concat_t, left_cur_pos
+
+
+def read_frame_match_triangulate(idx_frame1, to_rectified=True):
+    img1_left, img1_right = utils.read_images(idx_frame1)
+    kp1_left, des1_left, kp1_right, des1_right = utils.detect_and_compute(img1_left, img1_right)
+    matches1 = utils.find_matches(des1_left, des1_right)
+    kp1_left, des1_left, kp1_right, des1_right, dict_matches1 = utils.get_correlated_kps_and_des_from_matches(kp1_left,
+                                                                                                              des1_left,
+                                                                                                              kp1_right,
+                                                                                                              des1_right,
+                                                                                                              matches1)
+    if to_rectified:
+        kp1_left, des1_left, kp1_right, des1_right = utils.rectified_stereo_pattern_test(kp1_left, des1_left, kp1_right,
+                                                                                         des1_right)
+    points_cloud_1 = utils.triangulation_list_of_points(kp1_left, kp1_right)
+    return des1_left, des1_right, dict_matches1, kp1_left, kp1_right, points_cloud_1
 
 
 def ex3_run():
@@ -137,9 +176,12 @@ def ex3_run():
     kp0_left_l, des0_left_l, kp1_left_l, des1_left_l, dict_matches0_1_left = utils.get_correlated_kps_and_des_from_matches(
         kp0_left, des0_left, kp1_left, des1_left, matches_0_1_left)
     points_2d, points_3d = sample_4_points(kp0_left_l, kp1_left_l, points_cloud_0)
-    k, extrinsic_camera_mat_left0, extrinsic_camera_mat_right0 = utils.read_cameras()
+    global K
+    K, extrinsic_camera_mat_left0, extrinsic_camera_mat_right0 = utils.read_cameras()
+    global INDENTATION_RIGHT_CAM_MAT
+    INDENTATION_RIGHT_CAM_MAT = extrinsic_camera_mat_right0[0][3]
     extrinsic_camera_mat_left1, extrinsic_camera_mat_right1, r_mat, translation_vector = estimate_frame1_mats_pnp(
-        extrinsic_camera_mat_right0, k, points_2d, points_3d)
+        points_2d, points_3d)
     # print("extrinsic_camera_mat_left0:\n", extrinsic_camera_mat_left0)
     # print("extrinsic_camera_mat_right0:\n", extrinsic_camera_mat_right0)
     # print("extrinsic_camera_mat_left1:\n", extrinsic_camera_mat_left1)
@@ -173,13 +215,13 @@ def ex3_run():
     unsupporter_left0, unsupporter_left1 = [], []
     for i in range(len(kp1_left_l)):
         pt_3d = points_cloud_0[kp0_left_l[i]]
-        p_left0 = project_3d_pt_to_pixel(k, extrinsic_camera_mat_left0, pt_3d)
+        p_left0 = project_3d_pt_to_pixel(extrinsic_camera_mat_left0, pt_3d)
         real_p_left0 = kp0_left_l[i].pt
-        p_right0 = project_3d_pt_to_pixel(k, extrinsic_camera_mat_right0, pt_3d)
+        p_right0 = project_3d_pt_to_pixel(extrinsic_camera_mat_right0, pt_3d)
         real_p_right0 = dict_matches0[kp0_left_l[i]].pt
-        p_left1 = project_3d_pt_to_pixel(k, extrinsic_camera_mat_left1, pt_3d)
+        p_left1 = project_3d_pt_to_pixel(extrinsic_camera_mat_left1, pt_3d)
         real_p_left1 = kp1_left_l[i].pt
-        p_right1 = project_3d_pt_to_pixel(k, extrinsic_camera_mat_right1, pt_3d)
+        p_right1 = project_3d_pt_to_pixel(extrinsic_camera_mat_right1, pt_3d)
         real_p_right1 = dict_matches1[kp1_left_l[i]].pt
         if (
                 # np.linalg.norm(real_p_left0 - p_left0) <= 2 and np.linalg.norm(real_p_right0 - p_right0) <= 2 and
@@ -202,16 +244,16 @@ def ex3_run():
     plt.imshow(img1_left), plt.show()
 
     # 3.5
-    extrinsic_camera_mat_left1, extrinsic_camera_mat_right1, \
-        supporter_left0, supporter_left1, unsupporter_left0, unsupporter_left1 =\
-     RANSAC(kp0_left_l, kp1_left_l, points_cloud_0, extrinsic_camera_mat_right0, k, dict_matches1, dict_matches0_1_left)
+    extrinsic_camera_mat_left1, \
+        supporter_left0, supporter_left1, unsupporter_left0, unsupporter_left1 = \
+        RANSAC(kp0_left_l, kp1_left_l, points_cloud_0, dict_matches1, dict_matches0_1_left)
 
-    print("extrinsic_camera_mat_left0:\n", extrinsic_camera_mat_left0)
-    print("extrinsic_camera_mat_right0:\n", extrinsic_camera_mat_right0)
+    # print("extrinsic_camera_mat_left0:\n", extrinsic_camera_mat_left0)
+    # print("extrinsic_camera_mat_right0:\n", extrinsic_camera_mat_right0)
     print("extrinsic_camera_mat_left1:\n", extrinsic_camera_mat_left1)
-    print("extrinsic_camera_mat_right1:\n", extrinsic_camera_mat_right1)
+    # print("extrinsic_camera_mat_right1:\n", extrinsic_camera_mat_right1)
 
-    R, t = extrinsic_camera_mat_left1[:,:3], extrinsic_camera_mat_left1[:,3]
+    R, t = extrinsic_camera_mat_left1[:, :3], extrinsic_camera_mat_left1[:, 3]
     estimated_3d_point_frame1 = np.zeros((len(points_cloud_0), 3))
     pts_cloud_frame0 = list(points_cloud_0.values())
     pt_len = len(pts_cloud_frame0)
@@ -219,7 +261,8 @@ def ex3_run():
         estimated_3d_point_frame1[i] = R @ pts_cloud_frame0[i] + t
 
     utils.show_dots_3d_cloud([estimated_3d_point_frame1, list(points_cloud_1.values())],
-                             ['points from frame 1 (after triangulation)', 'points from frame 0 (after transformation T'],
+                             ['points from frame 1 (after triangulation)',
+                              'points from frame 0 (after transformation T'],
                              ['blue', 'red'],
                              '3d_point_cloud_frame1 triangulation vs transformation.html')
 
@@ -232,5 +275,19 @@ def ex3_run():
     img1_left = cv.drawKeypoints(img1_left, unsupporter_left1, img1_left, color=(0, 0, 128))
     cv.imwrite(f'img1_left_supporters_after_ransac.png', img1_left)
     plt.imshow(img1_left), plt.show()
+
+    # 3.6
+    kp1_left, des1_left, points_cloud_1, concat_r, concat_t, left_cur_pos =\
+        localization_two_frames(0, kp0_left, des0_left, points_cloud_0, extrinsic_camera_mat_left0[:, :3], extrinsic_camera_mat_left0[:,3])
+    print(concat_r)
+    print(concat_t)
+    print("new left cur_pos ", left_cur_pos)
+    left_cam_poses = []
+    concat_r, concat_t = extrinsic_camera_mat_left0[:, :3], extrinsic_camera_mat_left0[:, 3]
+    for i in range(100):
+        kp1_left, des1_left, points_cloud_1, concat_r, concat_t, left_cur_pos = \
+            localization_two_frames(i, kp0_left, des0_left, points_cloud_0, concat_r, concat_t)
+        left_cam_poses.append(left_cur_pos)
+        kp0_left, des0_left, points_cloud_0 = kp1_left, des1_left, points_cloud_1
 
 ex3_run()
