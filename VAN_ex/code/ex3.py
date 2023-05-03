@@ -23,6 +23,8 @@ def estimate_frame1_mats_pnp(points_2d, points_3d, flag=cv.SOLVEPNP_P3P):
     dist_coeffs = np.zeros((4, 1))
     success, rotation_vector, translation_vector = cv.solvePnP(points_3d, points_2d, K, dist_coeffs,
                                                                flags=flag)
+    if success == 0:
+        return None, None, None, None
     r_mat, _ = cv.Rodrigues(rotation_vector)
     extrinsic_camera_mat_left1 = np.hstack((r_mat, translation_vector))
     extrinsic_camera_mat_right1 = np.array(extrinsic_camera_mat_left1, copy=True)
@@ -77,6 +79,8 @@ def RANSAC(kp0_left_l, kp1_left_l, points_cloud_0, dict_matches1, dict_matches0_
         points_2d, points_3d = sample_4_points(kp0_left_l, kp1_left_l, points_cloud_0)
         extrinsic_camera_mat_left1, extrinsic_camera_mat_right1, r_mat, translation_vector = \
             estimate_frame1_mats_pnp(points_2d, points_3d)
+        if extrinsic_camera_mat_left1 is None:
+            continue
         supporter_left0, supporter_left1, _, _ = find_supporters(kp0_left_l, kp1_left_l, points_cloud_0,
                                                                  extrinsic_camera_mat_left1,
                                                                  extrinsic_camera_mat_right1,
@@ -85,9 +89,8 @@ def RANSAC(kp0_left_l, kp1_left_l, points_cloud_0, dict_matches1, dict_matches0_
         if supporters_num > max_supporters_num:
             max_supporters_num = supporters_num
             max_supporters_left0 = supporter_left0
-
-        # update eps
-        eps = (size - max_supporters_num) / size
+            # update eps
+            eps = (size - max_supporters_num) / size
         print(f'epsilon: {eps}, cur num sup: {supporters_num}, max num sup: {max_supporters_num}')
         i += 1
 
@@ -291,7 +294,7 @@ def ex3_run():
     #    localization_two_frames(0, kp0_left, des0_left, points_cloud_0, extrinsic_camera_mat_left0[:, :3], extrinsic_camera_mat_left0[:,3])
     left_cam_poses = []
     concat_r, concat_t = extrinsic_camera_mat_left0[:, :3], extrinsic_camera_mat_left0[:, 3]
-    for i in range(5):
+    for i in range(2559):
         print(f'---- frame iteration{i}----')
         kp1_left, des1_left, points_cloud_1, concat_r, concat_t, left_cur_pos = \
             localization_two_frames(i, kp0_left, des0_left, points_cloud_0, concat_r, concat_t)
