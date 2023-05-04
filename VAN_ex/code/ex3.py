@@ -71,11 +71,11 @@ def RANSAC(kp0_left_l, kp1_left_l, points_cloud_0, dict_matches1, dict_matches0_
     p, eps = 0.99, 0.99  # eps = prob to be outlier
     i = 0
     size = len(kp0_left_l)
-    print("sample_size ", size)
+    # print("sample_size ", size)
     max_supporters_num = 0
     max_supporters_left0 = None
     while eps > 0 and i < calc_max_iterations(p, eps, 4):
-        print("RANSAC iteration:", i)
+        # print("RANSAC iteration:", i)
         points_2d, points_3d = sample_4_points(kp0_left_l, kp1_left_l, points_cloud_0)
         extrinsic_camera_mat_left1, extrinsic_camera_mat_right1, r_mat, translation_vector = \
             estimate_frame1_mats_pnp(points_2d, points_3d)
@@ -91,12 +91,12 @@ def RANSAC(kp0_left_l, kp1_left_l, points_cloud_0, dict_matches1, dict_matches0_
             max_supporters_left0 = supporter_left0
             # update eps
             eps = (size - max_supporters_num) / size
-        print(f'epsilon: {eps}, cur num sup: {supporters_num}, max num sup: {max_supporters_num}')
+        # print(f'epsilon: {eps}, cur num sup: {supporters_num}, max num sup: {max_supporters_num}')
         i += 1
 
     points_3d_supporters = np.zeros((max_supporters_num, 3))
     points_2d_supporters = np.zeros((max_supporters_num, 2))
-    print("end RANSAC: max_supporters_num ", max_supporters_num)
+    # print("end RANSAC: max_supporters_num ", max_supporters_num)
     for i in range(max_supporters_num):
         points_3d_supporters[i] = points_cloud_0[max_supporters_left0[i]]
         points_2d_supporters[i] = dict_matches0_1_left[max_supporters_left0[i]].pt
@@ -114,7 +114,7 @@ def RANSAC(kp0_left_l, kp1_left_l, points_cloud_0, dict_matches1, dict_matches0_
 def find_cam_location_and_concat_mats(prev_concat_r, prev_concat_t, cur_r, cur_t):
     concat_r = cur_r @ prev_concat_r
     concat_t = cur_r @ prev_concat_t + cur_t
-    left_cur_pos = ((-np.linalg.inv(concat_r) @ concat_t).reshape(1, 3))[0]
+    left_cur_pos = ((-concat_r.T @ concat_t).reshape(1, 3))[0]
     return concat_r, concat_t, left_cur_pos
 
 
@@ -136,7 +136,8 @@ def localization_two_frames(idx_frame0, kp0_left, des0_left, points_cloud_0, pre
                dict_matches0_1_left)
     concat_r, concat_t, left_cur_pos = find_cam_location_and_concat_mats \
         (prev_concat_r, prev_concat_t, extrinsic_camera_mat_left1[:, :3], extrinsic_camera_mat_left1[:, 3])
-    points_cloud_1 = transform_points_cloud(points_cloud_1, extrinsic_camera_mat_left1[:, :3], extrinsic_camera_mat_left1[:, 3])
+    # points_cloud_1 = transform_points_cloud(points_cloud_1, extrinsic_camera_mat_left1[:, :3],
+    #                                         extrinsic_camera_mat_left1[:, 3])
     return kp1_left, des1_left, points_cloud_1, concat_r, concat_t, left_cur_pos
 
 
@@ -154,6 +155,17 @@ def read_frame_match_triangulate(idx_frame1, to_rectified=True):
                                                                                          des1_right)
     points_cloud_1 = utils.triangulation_list_of_points(kp1_left, kp1_right)
     return des1_left, des1_right, dict_matches1, kp1_left, kp1_right, points_cloud_1
+
+
+def read_matrices(path):
+    extrinsic_matrix = []
+    with open(path) as f:
+        for line in f:
+            l = line.split()
+            l = [float(i) for i in l]
+            m1 = np.array(l).reshape(3, 4)
+            extrinsic_matrix.append(m1)
+    return extrinsic_matrix
 
 
 def ex3_run():
@@ -290,8 +302,6 @@ def ex3_run():
     # plt.imshow(img1_left), plt.show()
 
     # 3.6
-    #kp1_left, des1_left, points_cloud_1, concat_r, concat_t, left_cur_pos =\
-    #    localization_two_frames(0, kp0_left, des0_left, points_cloud_0, extrinsic_camera_mat_left0[:, :3], extrinsic_camera_mat_left0[:,3])
     left_cam_poses = []
     concat_r, concat_t = extrinsic_camera_mat_left0[:, :3], extrinsic_camera_mat_left0[:, 3]
     for i in range(2559):
@@ -301,14 +311,30 @@ def ex3_run():
         left_cam_poses.append(left_cur_pos)
         kp0_left, des0_left, points_cloud_0 = kp1_left, des1_left, points_cloud_1
 
-
     left_cam_poses = np.array(left_cam_poses)
     x = left_cam_poses[:, 0]
     z = left_cam_poses[:, 2]
-    plt.scatter(x=x, y=z)
-    plt.title('Localization of kitty left camera from frames')
+
+    ground_truth_matrices = read_matrices("C:\\Users\\Miryam\\SLAM\\VAN_ex\\dataset\\poses\\05.txt")
+    real_left_cam_poses = []
+    for mat in ground_truth_matrices:
+        pos = ((-(mat[:, :3]).T @ mat[:,3]).reshape(1, 3))[0]
+        real_left_cam_poses.append(pos)
+
+    real_left_cam_poses = np.array(real_left_cam_poses)
+    real_x = real_left_cam_poses[:, 0]
+    real_z = real_left_cam_poses[:, 2]
+
+    fig, ax = plt.subplots()
+    ax.scatter(x=real_x, y=real_z, c='tab:orange', label='Ground truth localization', s=0.3, alpha=0.5)
+    ax.scatter(x=x, y=z, label='Our_estimated_localization', s=0.5, alpha=0.7)
+
+    ax.legend()
+
+    plt.title('Estimated vs Real localization')
     plt.xlabel('x')
     plt.ylabel('z')
     plt.savefig("localization.png")
+
 
 ex3_run()

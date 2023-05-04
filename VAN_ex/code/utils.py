@@ -44,7 +44,7 @@ def find_matches(des1, des2):
     :param des2:
     :return: new image with matches on it
     """
-    bf = cv.BFMatcher(cv.NORM_L1, crossCheck=True)
+    bf = cv.BFMatcher(cv.NORM_L2, crossCheck=True)
     matches = bf.match(des1, des2)
     return matches
 
