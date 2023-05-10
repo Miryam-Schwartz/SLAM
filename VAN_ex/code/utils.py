@@ -140,24 +140,16 @@ def triangulation_list_of_points(kp1, kp2, triangulation_func=triangulation_sing
     return dots_3d
 
 
-def match_and_triangulate_image(im_idx, triangulation_func=triangulation_single_match, rectified_test=False,
-                                threshold=1):
-    """
-    Read, find key-points, match and triangulate points.
-    :param threshold:
-    :param im_idx: index pair images
-    :param triangulation_func: function that makes the triangulation.
-    :param rectified_test: if True, reject points according to rectified_test
-    :return: list of 3d points, after the triangulation
-    """
+def match_and_triangulate_image(im_idx, rectified_test=False,
+                                triangulation_func=triangulation_single_match, threshold=1):
     img1, img2 = read_images(im_idx)
     kp1, des1, kp2, des2 = detect_and_compute(img1, img2)
-    matches = find_matches(img1, kp1, des1, img2, kp2, des2)
-    kp1, kp2 = get_correlated_kps_from_matches(kp1, kp2, matches)
+    matches = find_matches(des1, des2)
+    kp1, des1, kp2, des2, dict_left_to_right = get_correlated_kps_and_des_from_matches(kp1, des1, kp2, des2, matches)
     if rectified_test:
-        kp1, _, kp2, _ = rectified_stereo_pattern_test(kp1, kp2, threshold)
+        kp1, des1, kp2, des2 = rectified_stereo_pattern_test(kp1, des1, kp2, des2, threshold)
     dots_3d = triangulation_list_of_points(kp1, kp2, triangulation_func)
-    return kp1, kp2, dots_3d
+    return img1, img2, kp1, des1, kp2, des2, dots_3d, dict_left_to_right
 
 
 def get_correlated_kps_and_des_from_matches(kp1, des1, kp2, des2, matches):
@@ -182,6 +174,8 @@ def show_dots_3d_cloud(arrays_of_dots_3d, names_of_arrays, colors, output_name, 
         z = dots_3d[:, 2].reshape(-1)
         trace = go.Scatter3d(x=x, y=y, z=z, mode='markers', marker=dict(size=3, color=colors[i]), name=names_of_arrays[i])
         fig.add_trace(trace)
+        fig.update_layout(scene=dict(xaxis_range=[-40, 30], yaxis_range=[-35, 10], zaxis_range=[0, 400]))
     if show:
         fig.show()
     fig.write_html(output_name)
+
