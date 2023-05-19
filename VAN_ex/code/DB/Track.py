@@ -9,6 +9,12 @@ class Track:
         self._frames_dict[first_frame_id] = first_idx_kp_left
         self._frames_dict[second_frame_id] = second_idx_kp_left
 
+    def __init__(self, track_id, frame_id, idx_kp):
+        self._track_id = track_id
+        Track.tracks_counter += 1
+        self._frames_dict = dict()          # key = id of frame, val = idx of kp
+        self._frames_dict[frame_id] = idx_kp
+
     def get_frames_dict(self):
         return self._frames_dict
 
