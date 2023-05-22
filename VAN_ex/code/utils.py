@@ -179,3 +179,24 @@ def show_dots_3d_cloud(arrays_of_dots_3d, names_of_arrays, colors, output_name, 
         fig.show()
     fig.write_html(output_name)
 
+def calc_max_iterations(p, eps, size):
+    return np.log(1 - p) / np.log(1 - np.power(1 - eps, size))
+
+def estimate_frame1_mats_pnp(points_2d, points_3d, identation_right_cam_mat, K, flag=cv.SOLVEPNP_P3P):
+    dist_coeffs = np.zeros((4, 1))
+    success, rotation_vector, translation_vector = cv.solvePnP(points_3d, points_2d, K, dist_coeffs, flags=flag)
+    if success == 0:
+        return None, None
+    extrinsic_camera_mat_left1 = rodriguez_to_mat(rotation_vector, translation_vector)
+    extrinsic_camera_mat_right1 = np.array(extrinsic_camera_mat_left1, copy=True)
+    extrinsic_camera_mat_right1[0][3] += identation_right_cam_mat
+    return extrinsic_camera_mat_left1, extrinsic_camera_mat_right1
+
+def rodriguez_to_mat(rvec, tvec):
+    rot, _ = cv.Rodrigues(rvec)
+    return np.hstack((rot, tvec))
+
+def project_3d_pt_to_pixel(k, extrinsic_camera_mat, pt_3d):
+    pt_3d_h = np.append(pt_3d, [1])
+    projected = k @ extrinsic_camera_mat @ pt_3d_h
+    return projected[0:2] / projected[2]

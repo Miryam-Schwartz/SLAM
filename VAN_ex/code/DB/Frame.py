@@ -54,3 +54,11 @@ class Frame:
 
     def set_inliers_percentage(self, percentage):
         self._inliers_percentage = percentage
+
+    def get_number_outgoing_tracks(self):
+        counter = 0
+        for track in self._tracks_dict.values():
+            if self._frame_id + 1 in track.get_frames_dict():
+                counter += 1
+        return counter
+
