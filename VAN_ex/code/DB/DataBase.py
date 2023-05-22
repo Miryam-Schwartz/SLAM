@@ -1,5 +1,7 @@
 import csv
-
+import sys
+import random
+import cv2 as cv
 import numpy as np
 
 from VAN_ex.code import utils
@@ -24,15 +26,18 @@ class DataBase:
         second_des = self._frames_dict[second_frame_id].get_des_left()
         matches = utils.find_matches(first_des, second_des)
         matches = [(match.queryIdx, match.trainIdx) for match in matches]
+        extrinsic_camera_mat_second_frame_left, matches, inliers_percentage = \
+            self.RANSAC(first_frame_id, second_frame_id, matches)
         self._dict_matches_between_frames[(first_frame_id, second_frame_id)] = matches
         first_frame = self._frames_dict[first_frame_id]
         second_frame = self._frames_dict[second_frame_id]
+        second_frame.set_inliers_percentage(inliers_percentage)
         for first_idx_kp_left, second_idx_kp_left in matches:
             is_exist_track = False
             for _, track in first_frame.get_tracks_dict().items():
                 if track.get_kp_idx_of_frame(first_frame_id) == first_idx_kp_left:
                     is_exist_track = True
-                    print(second_frame_id, " added to track id ", _)
+                    # print(second_frame_id, " added to track id ", _)
                     # update track, update second_frame tracks
                     track.add_frame(second_frame_id, second_idx_kp_left)
                     second_frame.add_track(track)
@@ -43,6 +48,59 @@ class DataBase:
                 first_frame.add_track(new_track)
                 second_frame.add_track(new_track)
                 self._tracks_dict[new_track.get_id()] = new_track
+
+    def RANSAC(self, first_frame_id, second_frame_id, matches):
+        p, eps = 0.99, 0.99  # eps = prob to be outlier
+        i = 0
+        size = len(matches)
+        max_supporters_num = 0
+        idxs_max_supports_matches = None
+        while eps > 0 and i < utils.calc_max_iterations(p, eps, 4):
+            points_2d, points_3d = self.sample_4_points(first_frame_id, second_frame_id, matches)
+            extrinsic_camera_mat_left1, extrinsic_camera_mat_right1 = \
+                utils.estimate_frame1_mats_pnp(points_2d, points_3d, Frame.INDENTATION_RIGHT_CAM_MAT, Frame.k)
+            if extrinsic_camera_mat_left1 is None:
+                continue
+            idxs_of_supporters_matches = self.find_supporters(first_frame_id, second_frame_id, matches,
+                                                              extrinsic_camera_mat_left1,
+                                                              extrinsic_camera_mat_right1)
+            supporters_num = len(idxs_of_supporters_matches)
+            if supporters_num > max_supporters_num:
+                max_supporters_num = supporters_num
+                idxs_max_supports_matches = idxs_of_supporters_matches
+                # update eps
+                eps = (size - max_supporters_num) / size
+            i += 1
+        points_3d_supporters = np.empty((max_supporters_num, 3))
+        points_2d_supporters = np.empty((max_supporters_num, 2))
+        for i in range(max_supporters_num):
+            cur_match = matches[idxs_max_supports_matches[i]]
+            points_3d_supporters[i] = self._frames_dict[first_frame_id].get_3d_point(cur_match[0])
+            x_l, x_r, y = self._frames_dict[second_frame_id].get_feature_pixels(cur_match[1])
+            points_2d_supporters[i] = np.array([x_l, y])
+        extrinsic_camera_mat_left1, extrinsic_camera_mat_right1 = \
+            utils.estimate_frame1_mats_pnp(points_2d_supporters, points_3d_supporters,
+                                           Frame.INDENTATION_RIGHT_CAM_MAT, Frame.k,
+                                           flag=cv.SOLVEPNP_ITERATIVE)
+
+        idxs_max_supports_matches = self.find_supporters(first_frame_id, second_frame_id, matches,
+                                                         extrinsic_camera_mat_left1,
+                                                         extrinsic_camera_mat_right1)
+        matches = np.array(matches)
+        idxs_max_supports_matches = np.array(idxs_max_supports_matches)
+        return extrinsic_camera_mat_left1, matches[idxs_max_supports_matches], \
+            len(idxs_max_supports_matches) / len(matches)
+
+    def sample_4_points(self, first_frame_id, second_frame_id, matches):
+        rand_idxs = random.sample(range(len(matches)), 4)
+        points_3d = np.empty((4, 3))
+        points_2d = np.empty((4, 2))
+        for i in range(4):
+            cur_match = matches[rand_idxs[i]]  # kp_idx of first frame, kp_idx of second frame
+            points_3d[i] = self._frames_dict[first_frame_id].get_3d_point(cur_match[0])
+            x_l, x_r, y = self._frames_dict[second_frame_id].get_feature_pixels(cur_match[1])
+            points_2d[i] = np.array([x_l, y])
+        return points_2d, points_3d
 
     def get_tracks_of_frame(self, frame_id):
         if frame_id not in self._frames_dict:
@@ -83,14 +141,14 @@ class DataBase:
             kp2 = [kp.pt for kp in kp2]
             self.add_frame(i, kp1, kp2, des1)
 
-    def save_database(self, path):
-        self._save_tracks(path)
-        self._save_match_in_frame(path)
-        self._save_match_between_frames(path)
+    def save_database(self, path, db_id=''):
+        self._save_tracks(f'{path}tracks{db_id}.csv')
+        self._save_match_in_frame(f'{path}match_in_frame{db_id}.csv')
+        self._save_match_between_frames(f'{path}match_between_frames{db_id}.csv')
 
     def _save_tracks(self, path):
         header = ['track_id', 'frame_id', 'idx_kp']
-        with open(path + 'tracks.csv', 'w', encoding='UTF8', newline='') as f:
+        with open(path, 'w', encoding='UTF8', newline='') as f:
             writer = csv.writer(f)
             writer.writerow(header)
             for track_id, track in self._tracks_dict.items():
@@ -100,7 +158,7 @@ class DataBase:
 
     def _save_match_in_frame(self, path):
         header = ['frame_id', 'idx_kp', 'x_left', 'x_right', 'y']
-        with open(path + 'match_in_frame.csv', 'w', encoding='UTF8', newline='') as f:
+        with open(path, 'w', encoding='UTF8', newline='') as f:
             writer = csv.writer(f)
             writer.writerow(header)
             for frame_id, frame in self._frames_dict.items():
@@ -111,7 +169,7 @@ class DataBase:
 
     def _save_match_between_frames(self, path):
         header = ['first_frame_id', 'second_frame_id', 'first_idx_kp', 'second_idx_kp']
-        with open(path + 'match_between_frames.csv', 'w', encoding='UTF8', newline='') as f:
+        with open(path, 'w', encoding='UTF8', newline='') as f:
             writer = csv.writer(f)
             writer.writerow(header)
             for frames, matches_list in self._dict_matches_between_frames.items():
@@ -120,14 +178,16 @@ class DataBase:
                     row = [first_frame_id, second_frame_id, first_idx_kp, second_idx_kp]
                     writer.writerow(row)
 
-    def read_database(self, path):
+    def read_database(self, path, db_id=''):
         # assume database is empty
-        self._read_tracks(path)
-        self._read_match_in_frame(path)
-        self._read_match_between_frames(path)
+        assert (self.get_frames_number() == 0 and self.get_tracks_number() == 0)
+        self._read_tracks(f'{path}tracks{db_id}.csv')
+        self._read_match_in_frame(f'{path}match_in_frame{db_id}.csv')
+        self._read_match_between_frames(f'{path}match_between_frames{db_id}.csv')
+        # assume that the db will not be extended (descriptors are not been saved)
 
     def _read_tracks(self, path):
-        with open(path + 'tracks.csv', 'r') as f:
+        with open(path, 'r') as f:
             csvreader = csv.reader(f)
             next(csvreader)
             for row in csvreader:
@@ -140,13 +200,12 @@ class DataBase:
                     self._tracks_dict[track_id].add_frame(frame_id, idx_kp)
 
     def _read_match_in_frame(self, path):
-        with open(path + 'match_in_frame.csv', 'r') as f:
+        with open(path, 'r') as f:
             csvreader = csv.reader(f)
             next(csvreader)
             for row in csvreader:
                 frame_id, idx_kp, x_l, x_r, y = int(row[0]), int(row[1]), float(row[2]), float(row[3]), float(row[4])
                 if frame_id not in self._frames_dict:
-                    # todo think about restore des
                     self._frames_dict[frame_id] = Frame(frame_id, [(x_l, y)], [(x_r, y)], [])
                 else:
                     self._frames_dict[frame_id].add_kp(idx_kp, x_l, x_r, y)
@@ -156,15 +215,63 @@ class DataBase:
                 self._frames_dict[frame_id].add_track(track)
 
     def _read_match_between_frames(self, path):
-        with open(path + 'match_between_frames.csv', 'r') as f:
+        with open(path, 'r') as f:
             csvreader = csv.reader(f)
             next(csvreader)
             for row in csvreader:
-                first_frame_id, second_frame_id, first_idx_kp, second_idx_kp =\
+                first_frame_id, second_frame_id, first_idx_kp, second_idx_kp = \
                     int(row[0]), int(row[1]), int(row[2]), int(row[3])
                 if (first_frame_id, second_frame_id) not in self._dict_matches_between_frames:
-                    self._dict_matches_between_frames[(first_frame_id, second_frame_id)] =\
+                    self._dict_matches_between_frames[(first_frame_id, second_frame_id)] = \
                         [(first_idx_kp, second_idx_kp)]
                 else:
-                    self._dict_matches_between_frames[(first_frame_id, second_frame_id)]\
+                    self._dict_matches_between_frames[(first_frame_id, second_frame_id)] \
                         .append((first_idx_kp, second_idx_kp))
+
+    def get_tracks_number(self):
+        return len(self._tracks_dict)
+
+    def get_frames_number(self):
+        return len(self._frames_dict)
+
+    def get_mean_max_and_min_track_len(self):
+        sum_len = 0
+        min_len = sys.maxsize
+        max_len = 0
+        for track in self._tracks_dict.values():
+            track_len = track.get_track_len()
+            sum_len += track_len
+            min_len = min(min_len, track_len)
+            max_len = max(max_len, track_len)
+        return sum_len / self.get_tracks_number(), max_len, min_len
+
+    def get_mean_number_of_tracks_on_frame(self):
+        sum_tracks = 0
+        for frame in self._frames_dict.values():
+            sum_tracks += frame.get_number_of_tracks()
+        return sum_tracks / self.get_frames_number()
+
+    def get_track_in_len(self, length):
+        for track in self._tracks_dict.values():
+            if track.get_track_len() >= length:
+                return track
+        return None
+
+    def get_frame_obj(self, frame_id):
+        assert (frame_id in self._frames_dict)
+        return self._frames_dict[frame_id]
+
+    def find_supporters(self, first_frame_id, second_frame_id, matches, extrinsic_camera_mat_left1,
+                        extrinsic_camera_mat_right1):
+        idxs_supports_matches = []
+        for i in range(len(matches)):
+            pt_3d = self._frames_dict[first_frame_id].get_3d_point(matches[i][0])
+            pixel_second_left = utils.project_3d_pt_to_pixel(Frame.k, extrinsic_camera_mat_left1, pt_3d)
+            x_l, x_r, y = self._frames_dict[second_frame_id].get_feature_pixels(matches[i][1])
+            real_pixel_second_left = np.array([x_l, y])
+            pixel_second_right = utils.project_3d_pt_to_pixel(Frame.k, extrinsic_camera_mat_right1, pt_3d)
+            real_pixel_second_right = np.array([x_r, y])
+            if np.linalg.norm(real_pixel_second_left - pixel_second_left) <= 2 \
+                    and np.linalg.norm(real_pixel_second_right - pixel_second_right) <= 2:
+                idxs_supports_matches.append(i)
+        return idxs_supports_matches

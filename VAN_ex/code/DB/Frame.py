@@ -1,4 +1,10 @@
+from VAN_ex.code import utils
+
+
 class Frame:
+    k, m_left, m_right = utils.read_cameras()
+    INDENTATION_RIGHT_CAM_MAT = m_right[0][3]
+
     def __init__(self, frame_id, kp_left, kp_right, des_left):
         self._frame_id = frame_id
         # self._kp_left = [kp.pt for kp in kp_left]
@@ -6,7 +12,8 @@ class Frame:
         self._kp_left = kp_left
         self._kp_right = kp_right
         self._des_left = des_left
-        self._tracks_dict = dict()              # key = track_id, val = track object
+        self._tracks_dict = dict()  # key = track_id, val = track object
+        self._inliers_percentage = None
 
     def add_track(self, new_track):
         self._tracks_dict[new_track.get_id()] = new_track
@@ -16,6 +23,11 @@ class Frame:
 
     def get_des_left(self):
         return self._des_left
+
+    def get_3d_point(self, kp_idx):
+        pt_4d = utils.triangulation_single_match \
+            (Frame.k @ Frame.m_left, Frame.k @ Frame.m_right, self._kp_left[kp_idx], self._kp_right[kp_idx])
+        return pt_4d[:3] / pt_4d[3]
 
     def get_feature_pixels(self, kp_idx):
         x_l = self._kp_left[kp_idx][0]
@@ -37,3 +49,8 @@ class Frame:
             self._kp_left[idx_kp] = (x_l, y)
             self._kp_right[idx_kp] = (x_r, y)
 
+    def get_number_of_tracks(self):
+        return len(self._tracks_dict)
+
+    def set_inliers_percentage(self, percentage):
+        self._inliers_percentage = percentage
