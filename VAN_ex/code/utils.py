@@ -200,3 +200,12 @@ def project_3d_pt_to_pixel(k, extrinsic_camera_mat, pt_3d):
     pt_3d_h = np.append(pt_3d, [1])
     projected = k @ extrinsic_camera_mat @ pt_3d_h
     return projected[0:2] / projected[2]
+
+
+def create_hist(data_array, x_label, y_label, title, output_path):
+    fig = plt.figure()
+    plt.hist(data_array)
+    plt.xlabel(x_label)
+    plt.ylabel(y_label)
+    plt.title(title)
+    plt.savefig(output_path)

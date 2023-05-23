@@ -14,12 +14,23 @@ class DataBase:
         self._tracks_dict = dict()
         self._frames_dict = dict()
         self._dict_matches_between_frames = dict()  # key = (first frame, second frame), value = list of tuples of idx
+        self._concat_r = np.identity(3)
+        self._concat_t = np.zeros(3)
+
+    def find_cam_location_and_concat_mats(self, second_frame_id, cur_r, cur_t):
+        self._concat_r = cur_r @ self._concat_r
+        self._concat_t = cur_r @ self._concat_t + cur_t
+        left_cam_location = ((-self._concat_r.T @ self._concat_t).reshape(1, 3))[0]
+        self._frames_dict[second_frame_id].set_left_camera_location(left_cam_location)
 
     def add_frame(self, frame_id, kp_left, kp_right, des_left):
         frame = Frame(frame_id, kp_left, kp_right, des_left)
         self._frames_dict[frame_id] = frame
         if frame_id != 0:
             self._update_tracks(frame_id - 1, frame_id)
+        else:
+            frame.set_inliers_percentage(100)
+            frame.set_left_camera_location(np.zeros(3))
 
     def _update_tracks(self, first_frame_id, second_frame_id):
         first_des = self._frames_dict[first_frame_id].get_des_left()
@@ -28,6 +39,9 @@ class DataBase:
         matches = [(match.queryIdx, match.trainIdx) for match in matches]
         extrinsic_camera_mat_second_frame_left, matches, inliers_percentage = \
             self.RANSAC(first_frame_id, second_frame_id, matches)
+        cur_r = extrinsic_camera_mat_second_frame_left[:, :3]
+        cur_t = extrinsic_camera_mat_second_frame_left[:, 3]
+        self.find_cam_location_and_concat_mats(second_frame_id, cur_r, cur_t)
         self._dict_matches_between_frames[(first_frame_id, second_frame_id)] = matches
         first_frame = self._frames_dict[first_frame_id]
         second_frame = self._frames_dict[second_frame_id]
@@ -89,7 +103,7 @@ class DataBase:
         matches = np.array(matches)
         idxs_max_supports_matches = np.array(idxs_max_supports_matches)
         return extrinsic_camera_mat_left1, matches[idxs_max_supports_matches], \
-            len(idxs_max_supports_matches) / len(matches)
+            (len(idxs_max_supports_matches) / len(matches)) * 100
 
     def sample_4_points(self, first_frame_id, second_frame_id, matches):
         rand_idxs = random.sample(range(len(matches)), 4)
@@ -145,6 +159,7 @@ class DataBase:
         self._save_tracks(f'{path}tracks{db_id}.csv')
         self._save_match_in_frame(f'{path}match_in_frame{db_id}.csv')
         self._save_match_between_frames(f'{path}match_between_frames{db_id}.csv')
+        self._save_left_camera_locations(f'{path}left_camera_locations{db_id}.csv')
 
     def _save_tracks(self, path):
         header = ['track_id', 'frame_id', 'idx_kp']
@@ -178,12 +193,23 @@ class DataBase:
                     row = [first_frame_id, second_frame_id, first_idx_kp, second_idx_kp]
                     writer.writerow(row)
 
+    def _save_left_camera_locations(self, path):
+        header = ['frame_id', 'x', 'y', 'z']
+        with open(path, 'w', encoding='UTF8', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(header)
+            for frame_id, frame in self._frames_dict.items():
+                location = frame.get_left_camera_location()
+                row = [frame_id, location[0], location[1], location[2]]
+                writer.writerow(row)
+
     def read_database(self, path, db_id=''):
         # assume database is empty
         assert (self.get_frames_number() == 0 and self.get_tracks_number() == 0)
         self._read_tracks(f'{path}tracks{db_id}.csv')
         self._read_match_in_frame(f'{path}match_in_frame{db_id}.csv')
         self._read_match_between_frames(f'{path}match_between_frames{db_id}.csv')
+        self._read_left_camera_location(f'{path}left_camera_locations{db_id}.csv')
         # assume that the db will not be extended (descriptors are not been saved)
 
     def _read_tracks(self, path):
@@ -227,6 +253,15 @@ class DataBase:
                 else:
                     self._dict_matches_between_frames[(first_frame_id, second_frame_id)] \
                         .append((first_idx_kp, second_idx_kp))
+
+    def _read_left_camera_location(self, path):
+        with open(path, 'r') as f:
+            csvreader = csv.reader(f)
+            next(csvreader)
+            for row in csvreader:
+                frame_id, x, y, z = int(row[0]), float(row[1]), float(row[2]), float(row[3])
+                # assume frames_dict is full
+                self._frames_dict[frame_id].set_left_camera_location(np.array([x, y, z]))
 
     def get_tracks_number(self):
         return len(self._tracks_dict)
@@ -275,3 +310,9 @@ class DataBase:
                     and np.linalg.norm(real_pixel_second_right - pixel_second_right) <= 2:
                 idxs_supports_matches.append(i)
         return idxs_supports_matches
+
+    def get_track_obj(self, track_id):
+        assert (track_id in self._tracks_dict)
+        return self._tracks_dict[track_id]
+
+

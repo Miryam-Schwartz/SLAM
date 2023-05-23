@@ -14,6 +14,7 @@ class Frame:
         self._des_left = des_left
         self._tracks_dict = dict()  # key = track_id, val = track object
         self._inliers_percentage = None
+        self._left_camera_location = None    # in left0 coordinates system
 
     def add_track(self, new_track):
         self._tracks_dict[new_track.get_id()] = new_track
@@ -61,4 +62,15 @@ class Frame:
             if self._frame_id + 1 in track.get_frames_dict():
                 counter += 1
         return counter
+
+    def set_left_camera_location(self, pose):
+        self._left_camera_location = pose
+
+    def get_left_camera_location(self):
+        if self._left_camera_location is None:
+            raise "location is None"
+        return self._left_camera_location
+
+    def get_inliers_percentage(self):
+        return self._inliers_percentage
 

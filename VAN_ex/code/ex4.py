@@ -64,9 +64,30 @@ def connectivity_graph(db):
     fig.write_image(f"{OUTPUT_DIR}connectivity_graph.png")
 
 
+def inliers_percentage_graph(db):
+    frames_num = db.get_frames_number()
+    inliers_percentage = np.empty(frames_num)
+    for i in range(frames_num):
+        inliers_percentage[i] = db.get_frame_obj(i).get_inliers_percentage()
+    fig = px.scatter(x=np.arange(frames_num), y=inliers_percentage, title="Inliers percentage per frame",
+                     labels={'x': 'Frame', 'y': 'Inliers Percentage'})
+    fig.write_image(f"{OUTPUT_DIR}inliers_percentage_graph.png")
+
+
+def tracks_length_histogram(db):
+    tracks_number = db.get_tracks_number()
+    tracks_length = np.empty(tracks_number)
+    for i in range(tracks_number):
+        tracks_length[i] = db.get_track_obj(i).get_track_len()
+    utils.create_hist(tracks_length, 'Track length', 'Track #',
+                      'Tracks Length Histogram', f'{OUTPUT_DIR}tracks_length_histogram.png')
+
+
+
+
 def ex4_run():
     db = DataBase()
-    db.fill_database(11)
+    db.fill_database(20)
     db.save_database('C:\\Users\\Miryam\\SLAM\\VAN_ex\\code\\DB\\')
     # db = DataBase()
     # db.read_database('C:\\Users\\Miryam\\SLAM\\VAN_ex\\code\\DB\\', 1)
@@ -84,6 +105,12 @@ def ex4_run():
 
     # 4.4
     connectivity_graph(db)
+
+    # 4.5
+    inliers_percentage_graph(db)
+
+    # 4.6
+    tracks_length_histogram(db)
     return 0
 
 
