@@ -286,11 +286,13 @@ class DataBase:
             sum_tracks += frame.get_number_of_tracks()
         return sum_tracks / self.get_frames_number()
 
-    def get_track_in_len(self, length):
+    def get_random_track_in_len(self, length):
+        tracks = []
         for track in self._tracks_dict.values():
             if track.get_track_len() >= length:
-                return track
-        return None
+                tracks.append(track)
+        rand_idx = random.randint(0, len(tracks)-1)
+        return tracks[rand_idx]
 
     def get_frame_obj(self, frame_id):
         assert (frame_id in self._frames_dict)
@@ -314,5 +316,12 @@ class DataBase:
     def get_track_obj(self, track_id):
         assert (track_id in self._tracks_dict)
         return self._tracks_dict[track_id]
+
+    def get_camera_locations(self):
+        locations = np.empty((self.get_frames_number(), 3))
+        for frame_id, frame_obj in self._frames_dict.items():
+            locations[frame_id] = frame_obj.get_left_camera_location()
+        return locations
+
 
 

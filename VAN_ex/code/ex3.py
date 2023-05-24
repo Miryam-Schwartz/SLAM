@@ -222,7 +222,7 @@ def ex3_run():
     ground_truth_matrices = read_matrices("C:\\Users\\Miryam\\SLAM\\VAN_ex\\dataset\\poses\\05.txt")
     real_left_cam_poses = []
     for mat in ground_truth_matrices:
-        pos = ((-(mat[:, :3]).T @ mat[:,3]).reshape(1, 3))[0]
+        pos = ((-(mat[:, :3]).T @ mat[:, 3]).reshape(1, 3))[0]
         real_left_cam_poses.append(pos)
 
     real_left_cam_poses = np.array(real_left_cam_poses)

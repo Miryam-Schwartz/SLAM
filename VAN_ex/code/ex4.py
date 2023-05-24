@@ -2,6 +2,8 @@ import os
 import plotly.express as px
 import numpy as np
 from matplotlib import pyplot as plt
+from VAN_ex.code.DB.Frame import Frame
+import plotly.graph_objs as go
 
 from VAN_ex.code import utils
 from VAN_ex.code.DB.DataBase import DataBase
@@ -22,7 +24,7 @@ def crop_img(img, x, y):
 
 
 def show_feature_track(db, num_frames):
-    track = db.get_track_in_len(num_frames)
+    track = db.get_random_track_in_len(num_frames)
     if track is None:
         raise "there is no track in length >= num_frames"
     fig, grid = plt.subplots(num_frames, 2)
@@ -59,8 +61,8 @@ def connectivity_graph(db):
     outgoing_frames = np.empty(frames_num)
     for i in range(frames_num):
         outgoing_frames[i] = db.get_frame_obj(i).get_number_outgoing_tracks()
-    fig = px.scatter(x=np.arange(frames_num), y=outgoing_frames, title="Connectivity",
-                     labels={'x': 'Frame', 'y': 'Outgoing tracks'})
+    fig = px.line(x=np.arange(frames_num), y=outgoing_frames, title="Connectivity",
+                  labels={'x': 'Frame', 'y': 'Outgoing tracks'})
     fig.write_image(f"{OUTPUT_DIR}connectivity_graph.png")
 
 
@@ -69,8 +71,8 @@ def inliers_percentage_graph(db):
     inliers_percentage = np.empty(frames_num)
     for i in range(frames_num):
         inliers_percentage[i] = db.get_frame_obj(i).get_inliers_percentage()
-    fig = px.scatter(x=np.arange(frames_num), y=inliers_percentage, title="Inliers percentage per frame",
-                     labels={'x': 'Frame', 'y': 'Inliers Percentage'})
+    fig = px.line(x=np.arange(frames_num), y=inliers_percentage, title="Inliers percentage per frame",
+                  labels={'x': 'Frame', 'y': 'Inliers Percentage'})
     fig.write_image(f"{OUTPUT_DIR}inliers_percentage_graph.png")
 
 
@@ -79,38 +81,108 @@ def tracks_length_histogram(db):
     tracks_length = np.empty(tracks_number)
     for i in range(tracks_number):
         tracks_length[i] = db.get_track_obj(i).get_track_len()
-    utils.create_hist(tracks_length, 'Track length', 'Track #',
-                      'Tracks Length Histogram', f'{OUTPUT_DIR}tracks_length_histogram.png')
+    unique, count = np.unique(tracks_length, return_counts=True)
+    fig = px.line(x=unique, y=count, title='Tracks Length Histogram',
+                  labels={'x': 'Track length', 'y': 'Track #'})
+    fig.write_image(f'{OUTPUT_DIR}tracks_length_histogram.png')
 
 
+def reprojection_error(db):
+    track = db.get_random_track_in_len(10)
+    ground_truth_matrices = utils.read_matrices("C:\\Users\\Miryam\\SLAM\\VAN_ex\\dataset\\poses\\05.txt")
+    last_frame_id, kp_idx = track.get_last_frame_id_and_kp_idx()
+    pt_3d = db.get_frame_obj(last_frame_id).get_3d_point(kp_idx)  # in coordinates of last frame
+    mat = ground_truth_matrices[last_frame_id]
+    r, t = mat[:, :3], mat[:, 3]
+    world_coor_3d_pt = r.T @ (pt_3d - t)
+    track_len = track.get_track_len()
+    reprojection_error_left = np.empty(track_len)
+    reprojection_error_right = np.empty(track_len)
+    frames_dict = track.get_frames_dict()
+    i = 0
+    for frame_id, kp_idx in frames_dict.items():
+        frame_obj = db.get_frame_obj(frame_id)
+        extrinsic_camera_mat_right = np.array(ground_truth_matrices[frame_id], copy=True)
+        extrinsic_camera_mat_right[0][3] += Frame.INDENTATION_RIGHT_CAM_MAT
+        proj_left_pixel = utils.project_3d_pt_to_pixel(Frame.k, ground_truth_matrices[frame_id], world_coor_3d_pt)
+        proj_right_pixel = utils.project_3d_pt_to_pixel(Frame.k, extrinsic_camera_mat_right, world_coor_3d_pt)
+        x_l, x_r, y = frame_obj.get_feature_pixels(kp_idx)
+        reprojection_error_left[i] = np.linalg.norm(proj_left_pixel - np.array([x_l, y]))
+        reprojection_error_right[i] = np.linalg.norm(proj_right_pixel - np.array([x_r, y]))
+        i += 1
+    reprojection_error_left = reprojection_error_left[:len(reprojection_error_left) - 1]
+    reprojection_error_right = reprojection_error_right[:len(reprojection_error_right) - 1]
+
+    frames_arr = np.array(list(frames_dict.keys()))
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(x=frames_arr, y=reprojection_error_left, mode='lines+markers', name='Left error'
+                   # title=f"Reprojection error size (L2 norm) over track {track.get_id()} images",
+                   # labels={'x': 'Frame', 'y': 'Reprojection error'})
+                   ))
+    fig.add_trace(
+        go.Scatter(x=frames_arr, y=reprojection_error_right, mode='lines+markers', name='Right error'
+                   # title=f"Reprojection error size (L2 norm) over track {track.get_id()} images",
+                   # labels={'x': 'Frame', 'y': 'Reprojection error'})
+                   ))
+    fig.update_layout(title=f"Reprojection error size (L2 norm) over track {track.get_id()} images",
+                      xaxis_title='Frame id', yaxis_title='Reprojection error')
+    fig.write_image(f"{OUTPUT_DIR}reprojection_error.png")
 
 
 def ex4_run():
-    db = DataBase()
-    db.fill_database(20)
-    db.save_database('C:\\Users\\Miryam\\SLAM\\VAN_ex\\code\\DB\\')
-    # db = DataBase()
-    # db.read_database('C:\\Users\\Miryam\\SLAM\\VAN_ex\\code\\DB\\', 1)
-    # db.save_database('C:\\Users\\Miryam\\SLAM\\VAN_ex\\code\\DB\\', 2)
+    db1 = DataBase()
+    db1.fill_database(2560)
+    db1.save_database('C:\\Users\\Miryam\\SLAM\\VAN_ex\\code\\DB\\', 1)
+    db2 = DataBase()
+    db2.read_database('C:\\Users\\Miryam\\SLAM\\VAN_ex\\code\\DB\\', 1)
+    db2.save_database('C:\\Users\\Miryam\\SLAM\\VAN_ex\\code\\DB\\', 2)
 
     # 4.2
-    print("Total number of tracks: ", db.get_tracks_number())
-    print("Number of frames: ", db.get_frames_number())
-    mean, max_t, min_t = db.get_mean_max_and_min_track_len()
+    print("Total number of tracks: ", db1.get_tracks_number())
+    print("Number of frames: ", db1.get_frames_number())
+    mean, max_t, min_t = db1.get_mean_max_and_min_track_len()
     print(f"Mean track length: {mean}\nMaximum track length: {max_t}\nMinimum track length: {min_t}")
-    print("Mean number of tracks on average frame: ", db.get_mean_number_of_tracks_on_frame())
+    print("Mean number of tracks on average frame: ", db1.get_mean_number_of_tracks_on_frame())
 
     # 4.3
-    show_feature_track(db, 10)
+    show_feature_track(db1, 10)
 
     # 4.4
-    connectivity_graph(db)
+    connectivity_graph(db1)
 
     # 4.5
-    inliers_percentage_graph(db)
+    inliers_percentage_graph(db1)
 
     # 4.6
-    tracks_length_histogram(db)
+    tracks_length_histogram(db1)
+
+    # 4.7
+    reprojection_error(db1)
+
+    locations = db1.get_camera_locations()
+    ground_truth_matrices = utils.read_matrices("C:\\Users\\Miryam\\SLAM\\VAN_ex\\dataset\\poses\\05.txt")
+    real_left_cam_poses = []
+    for mat in ground_truth_matrices:
+        pos = ((-(mat[:, :3]).T @ mat[:, 3]).reshape(1, 3))[0]
+        real_left_cam_poses.append(pos)
+
+    real_left_cam_poses = np.array(real_left_cam_poses)
+    real_x = real_left_cam_poses[:, 0]
+    real_z = real_left_cam_poses[:, 2]
+
+    fig, ax = plt.subplots()
+    ax.scatter(x=real_x, y=real_z, c='tab:orange', label='Ground truth localization', s=0.3, alpha=0.5)
+    ax.scatter(x=locations[:, 0], y=locations[:, 2], label='Our_estimated_localization', s=0.5, alpha=0.7)
+
+    ax.legend()
+
+    plt.title('Estimated vs Real localization')
+    plt.xlabel('x')
+    plt.ylabel('z')
+    plt.savefig(f'{OUTPUT_DIR}localization.png')
+
     return 0
 
 

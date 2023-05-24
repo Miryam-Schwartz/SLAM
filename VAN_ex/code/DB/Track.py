@@ -22,9 +22,9 @@ class Track:
     def get_id(self):
         return self._track_id
 
-    # def get_last_kp_frame_idx(self):
-    #     max_key = max(self._frames_dict.keys())
-    #     return self._frames_dict[max_key]      # the last frame and its idx of left kp
+    def get_last_frame_id_and_kp_idx(self):
+        max_key = max(self._frames_dict.keys())
+        return max_key, self._frames_dict[max_key]      # the last frame and its idx of left kp
 
     def get_kp_idx_of_frame(self, frame_id):
         assert (frame_id in self._frames_dict)
