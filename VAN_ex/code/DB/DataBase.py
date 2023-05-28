@@ -90,8 +90,8 @@ class DataBase:
         for i in range(max_supporters_num):
             cur_match = matches[idxs_max_supports_matches[i]]
             points_3d_supporters[i] = self._frames_dict[first_frame_id].get_3d_point(cur_match[0])
-            x_l, x_r, y = self._frames_dict[second_frame_id].get_feature_pixels(cur_match[1])
-            points_2d_supporters[i] = np.array([x_l, y])
+            pixel_left, pixel_right = self._frames_dict[second_frame_id].get_feature_pixels(cur_match[1])
+            points_2d_supporters[i] = np.array(pixel_left)
         extrinsic_camera_mat_left1, extrinsic_camera_mat_right1 = \
             utils.estimate_frame1_mats_pnp(points_2d_supporters, points_3d_supporters,
                                            Frame.INDENTATION_RIGHT_CAM_MAT, Frame.k,
@@ -112,8 +112,8 @@ class DataBase:
         for i in range(4):
             cur_match = matches[rand_idxs[i]]  # kp_idx of first frame, kp_idx of second frame
             points_3d[i] = self._frames_dict[first_frame_id].get_3d_point(cur_match[0])
-            x_l, x_r, y = self._frames_dict[second_frame_id].get_feature_pixels(cur_match[1])
-            points_2d[i] = np.array([x_l, y])
+            pixel_left, pixel_right = self._frames_dict[second_frame_id].get_feature_pixels(cur_match[1])
+            points_2d[i] = np.array(pixel_left)
         return points_2d, points_3d
 
     def get_tracks_of_frame(self, frame_id):
@@ -172,14 +172,14 @@ class DataBase:
                     writer.writerow(row)
 
     def _save_match_in_frame(self, path):
-        header = ['frame_id', 'idx_kp', 'x_left', 'x_right', 'y']
+        header = ['frame_id', 'idx_kp', 'x_left', 'y_left', 'x_right', 'y_right']
         with open(path, 'w', encoding='UTF8', newline='') as f:
             writer = csv.writer(f)
             writer.writerow(header)
             for frame_id, frame in self._frames_dict.items():
                 for i in range(frame.get_kp_len()):
-                    x_l, x_r, y = frame.get_feature_pixels(i)
-                    row = [frame_id, i, x_l, x_r, y]
+                    pixel_left, pixel_right = frame.get_feature_pixels(i)
+                    row = [frame_id, i, pixel_left[0], pixel_left[1], pixel_right[0], pixel_right[1]]
                     writer.writerow(row)
 
     def _save_match_between_frames(self, path):
@@ -230,11 +230,12 @@ class DataBase:
             csvreader = csv.reader(f)
             next(csvreader)
             for row in csvreader:
-                frame_id, idx_kp, x_l, x_r, y = int(row[0]), int(row[1]), float(row[2]), float(row[3]), float(row[4])
+                frame_id, idx_kp, x_l, y_l, x_r, y_r =\
+                    int(row[0]), int(row[1]), float(row[2]), float(row[3]), float(row[4]), float(row[5])
                 if frame_id not in self._frames_dict:
-                    self._frames_dict[frame_id] = Frame(frame_id, [(x_l, y)], [(x_r, y)], [])
+                    self._frames_dict[frame_id] = Frame(frame_id, [(x_l, y_l)], [(x_r, y_r)], [])
                 else:
-                    self._frames_dict[frame_id].add_kp(idx_kp, x_l, x_r, y)
+                    self._frames_dict[frame_id].add_kp(idx_kp, (x_l, y_l), (x_r, y_r))
         for track_id, track in self._tracks_dict.items():
             for frame_id in track.get_frames_dict():
                 assert (frame_id in self._frames_dict)
@@ -304,10 +305,10 @@ class DataBase:
         for i in range(len(matches)):
             pt_3d = self._frames_dict[first_frame_id].get_3d_point(matches[i][0])
             pixel_second_left = utils.project_3d_pt_to_pixel(Frame.k, extrinsic_camera_mat_left1, pt_3d)
-            x_l, x_r, y = self._frames_dict[second_frame_id].get_feature_pixels(matches[i][1])
-            real_pixel_second_left = np.array([x_l, y])
+            pixel_left, pixel_right = self._frames_dict[second_frame_id].get_feature_pixels(matches[i][1])
+            real_pixel_second_left = np.array(pixel_left)
             pixel_second_right = utils.project_3d_pt_to_pixel(Frame.k, extrinsic_camera_mat_right1, pt_3d)
-            real_pixel_second_right = np.array([x_r, y])
+            real_pixel_second_right = np.array(pixel_right)
             if np.linalg.norm(real_pixel_second_left - pixel_second_left) <= 2 \
                     and np.linalg.norm(real_pixel_second_right - pixel_second_right) <= 2:
                 idxs_supports_matches.append(i)

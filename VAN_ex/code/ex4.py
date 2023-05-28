@@ -37,10 +37,10 @@ def show_feature_track(db, num_frames):
     grid[0, 1].set_title("Right")
     i = 0
     for frame_id, kp_idx in track.get_frames_dict().items():
-        x_left, x_right, y = db.get_frame_obj(frame_id).get_feature_pixels(kp_idx)
+        pixel_left, pixel_right = db.get_frame_obj(frame_id).get_feature_pixels(kp_idx)
         img_left, img_right = utils.read_images(frame_id)
-        img_left, x_left, y_left = crop_img(img_left, x_left, y)
-        img_right, x_right, y_right = crop_img(img_right, x_right, y)
+        img_left, x_left, y_left = crop_img(img_left, pixel_left[0], pixel_left[1])
+        img_right, x_right, y_right = crop_img(img_right, pixel_right[0], pixel_right[1])
         grid[i, 0].axes.xaxis.set_visible(False)
         grid[i, 0].axes.yaxis.set_label_text(f"frame: {frame_id}")
         grid[i, 0].set_yticklabels([])
@@ -106,9 +106,9 @@ def reprojection_error(db):
         extrinsic_camera_mat_right[0][3] += Frame.INDENTATION_RIGHT_CAM_MAT
         proj_left_pixel = utils.project_3d_pt_to_pixel(Frame.k, ground_truth_matrices[frame_id], world_coor_3d_pt)
         proj_right_pixel = utils.project_3d_pt_to_pixel(Frame.k, extrinsic_camera_mat_right, world_coor_3d_pt)
-        x_l, x_r, y = frame_obj.get_feature_pixels(kp_idx)
-        reprojection_error_left[i] = np.linalg.norm(proj_left_pixel - np.array([x_l, y]))
-        reprojection_error_right[i] = np.linalg.norm(proj_right_pixel - np.array([x_r, y]))
+        pixel_left, pixel_right = frame_obj.get_feature_pixels(kp_idx)
+        reprojection_error_left[i] = np.linalg.norm(proj_left_pixel - np.array(pixel_left))
+        reprojection_error_right[i] = np.linalg.norm(proj_right_pixel - np.array(pixel_right))
         i += 1
     reprojection_error_left = reprojection_error_left[:len(reprojection_error_left) - 1]
     reprojection_error_right = reprojection_error_right[:len(reprojection_error_right) - 1]
@@ -132,36 +132,39 @@ def reprojection_error(db):
 
 
 def ex4_run():
-    db1 = DataBase()
-    db1.fill_database(2560)
-    db1.save_database('C:\\Users\\Miryam\\SLAM\\VAN_ex\\code\\DB\\', 1)
+    # 4.1
+    db = DataBase()
+    db.fill_database(2560)
+    db.save_database('C:\\Users\\Miryam\\SLAM\\VAN_ex\\code\\DB\\')
+
     db2 = DataBase()
-    db2.read_database('C:\\Users\\Miryam\\SLAM\\VAN_ex\\code\\DB\\', 1)
+    db2.read_database('C:\\Users\\Miryam\\SLAM\\VAN_ex\\code\\DB\\')
     db2.save_database('C:\\Users\\Miryam\\SLAM\\VAN_ex\\code\\DB\\', 2)
 
     # 4.2
-    print("Total number of tracks: ", db1.get_tracks_number())
-    print("Number of frames: ", db1.get_frames_number())
-    mean, max_t, min_t = db1.get_mean_max_and_min_track_len()
+    print("Total number of tracks: ", db.get_tracks_number())
+    print("Number of frames: ", db.get_frames_number())
+    mean, max_t, min_t = db.get_mean_max_and_min_track_len()
     print(f"Mean track length: {mean}\nMaximum track length: {max_t}\nMinimum track length: {min_t}")
-    print("Mean number of tracks on average frame: ", db1.get_mean_number_of_tracks_on_frame())
+    print("Mean number of tracks on average frame: ", db.get_mean_number_of_tracks_on_frame())
 
     # 4.3
-    show_feature_track(db1, 10)
+    show_feature_track(db, 10)
 
     # 4.4
-    connectivity_graph(db1)
+    connectivity_graph(db)
 
     # 4.5
-    inliers_percentage_graph(db1)
+    inliers_percentage_graph(db)
 
     # 4.6
-    tracks_length_histogram(db1)
+    tracks_length_histogram(db)
 
     # 4.7
-    reprojection_error(db1)
+    reprojection_error(db)
 
-    locations = db1.get_camera_locations()
+    # use the database for localization
+    locations = db.get_camera_locations()
     ground_truth_matrices = utils.read_matrices("C:\\Users\\Miryam\\SLAM\\VAN_ex\\dataset\\poses\\05.txt")
     real_left_cam_poses = []
     for mat in ground_truth_matrices:

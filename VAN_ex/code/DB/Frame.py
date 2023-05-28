@@ -31,24 +31,19 @@ class Frame:
         return pt_4d[:3] / pt_4d[3]
 
     def get_feature_pixels(self, kp_idx):
-        x_l = self._kp_left[kp_idx][0]
-        y_l = self._kp_left[kp_idx][1]
-        x_r = self._kp_right[kp_idx][0]
-        y_r = self._kp_right[kp_idx][1]
-        y = (y_l + y_r) / 2
-        return x_l, x_r, y
+        return self._kp_left[kp_idx], self._kp_right[kp_idx]
 
     def get_kp_len(self):
         return len(self._kp_left)
 
-    def add_kp(self, idx_kp, x_l, x_r, y):
+    def add_kp(self, idx_kp, pixel_left, pixel_right):
         assert (idx_kp in range(len(self._kp_left) + 1))
         if idx_kp == len(self._kp_left):
-            self._kp_left.append((x_l, y))
-            self._kp_right.append((x_r, y))
+            self._kp_left.append(pixel_left)
+            self._kp_right.append(pixel_right)
         else:
-            self._kp_left[idx_kp] = (x_l, y)
-            self._kp_right[idx_kp] = (x_r, y)
+            self._kp_left[idx_kp] = pixel_left
+            self._kp_right[idx_kp] = pixel_right
 
     def get_number_of_tracks(self):
         return len(self._tracks_dict)
