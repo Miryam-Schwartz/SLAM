@@ -3,7 +3,6 @@ import numpy as np
 from matplotlib import pyplot as plt
 import plotly.graph_objs as go
 
-
 DATA_PATH = r'C:\\Users\\Miryam\\SLAM\\VAN_ex\\dataset\\sequences\\05\\'
 
 
@@ -166,23 +165,27 @@ def get_correlated_kps_and_des_from_matches(kp1, des1, kp2, des2, matches):
 
 
 def show_dots_3d_cloud(arrays_of_dots_3d, names_of_arrays, colors, output_name, show=False):
-    fig = go.Figure(go.Scatter3d(x=[0], y=[0], z=[0], mode='markers', marker=dict(size=5, color='yellow'), name='camera'))
+    fig = go.Figure(
+        go.Scatter3d(x=[0], y=[0], z=[0], mode='markers', marker=dict(size=5, color='yellow'), name='camera'))
     for i in range(len(arrays_of_dots_3d)):
         dots_3d = np.array(arrays_of_dots_3d[i])
         x = dots_3d[:, 0].reshape(-1)
         y = dots_3d[:, 1].reshape(-1)
         z = dots_3d[:, 2].reshape(-1)
-        trace = go.Scatter3d(x=x, y=y, z=z, mode='markers', marker=dict(size=3, color=colors[i]), name=names_of_arrays[i])
+        trace = go.Scatter3d(x=x, y=y, z=z, mode='markers', marker=dict(size=3, color=colors[i]),
+                             name=names_of_arrays[i])
         fig.add_trace(trace)
         fig.update_layout(scene=dict(xaxis_range=[-40, 30], yaxis_range=[-35, 10], zaxis_range=[0, 400]))
     if show:
         fig.show()
     fig.write_html(output_name)
 
+
 def calc_max_iterations(p, eps, size):
     return np.log(1 - p) / np.log(1 - np.power(1 - eps, size))
 
-def estimate_frame1_mats_pnp(points_2d, points_3d, identation_right_cam_mat, K, flag=cv.SOLVEPNP_P3P):
+
+def estimate_second_frame_mats_pnp(points_2d, points_3d, identation_right_cam_mat, K, flag=cv.SOLVEPNP_P3P):
     dist_coeffs = np.zeros((4, 1))
     success, rotation_vector, translation_vector = cv.solvePnP(points_3d, points_2d, K, dist_coeffs, flags=flag)
     if success == 0:
@@ -192,9 +195,11 @@ def estimate_frame1_mats_pnp(points_2d, points_3d, identation_right_cam_mat, K, 
     extrinsic_camera_mat_right1[0][3] += identation_right_cam_mat
     return extrinsic_camera_mat_left1, extrinsic_camera_mat_right1
 
+
 def rodriguez_to_mat(rvec, tvec):
     rot, _ = cv.Rodrigues(rvec)
     return np.hstack((rot, tvec))
+
 
 def project_3d_pt_to_pixel(k, extrinsic_camera_mat, pt_3d):
     pt_3d_h = np.append(pt_3d, [1])
@@ -208,4 +213,36 @@ def create_hist(data_array, x_label, y_label, title, output_path):
     plt.xlabel(x_label)
     plt.ylabel(y_label)
     plt.title(title)
+    plt.savefig(output_path)
+
+
+def read_matrices(path):
+    matrices = []
+    with open(path) as f:
+        for line in f:
+            list_line = [float(i) for i in line.split()]
+            m1 = np.array(list_line).reshape(3, 4)
+            matrices.append(m1)
+    return matrices
+
+
+def calculate_ground_truth_locations_from_matrices(ground_truth_matrices):
+    locations = []
+    for mat in ground_truth_matrices:
+        pos = ((-(mat[:, :3]).T @ mat[:, 3]).reshape(1, 3))[0]
+        locations.append(pos)
+    locations = np.array(locations)
+    return locations
+
+
+def show_localization(estimated_locations, ground_truth_locations, output_path):
+    fig, ax = plt.subplots()
+    ax.scatter(x=ground_truth_locations[:, 0], y=ground_truth_locations[:, 2],
+               c='tab:orange', label='Ground truth localization', s=0.3, alpha=0.5)
+    ax.scatter(x=estimated_locations[:, 0], y=estimated_locations[:, 2],
+               label='Our_estimated_localization', s=0.5, alpha=0.7)
+    ax.legend()
+    plt.title('Estimated vs Real localization')
+    plt.xlabel('x')
+    plt.ylabel('z')
     plt.savefig(output_path)
