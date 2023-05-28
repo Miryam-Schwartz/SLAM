@@ -2,9 +2,9 @@ import os
 import plotly.express as px
 import numpy as np
 from matplotlib import pyplot as plt
-from VAN_ex.code.DB.Frame import Frame
 import plotly.graph_objs as go
 
+from VAN_ex.code.DB.Frame import Frame
 from VAN_ex.code import utils
 from VAN_ex.code.DB.DataBase import DataBase
 
@@ -12,18 +12,33 @@ OUTPUT_DIR = 'results\\ex4\\'
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
-def crop_img(img, x, y):
-    up_y = int(max(0, y - 50))
-    down_y = int(min(len(img), y + 50))
-    left_x = int(max(x - 50, 0))
-    right_x = int(min(x + 50, len(img[0])))
+def crop_img(img, x, y, crop_size=50):
+    """
+    Crop the image around the pixel (x,y) in size of crop_size
+    return the cropped image and the new pixel of the same feature in the cropped image
+    :param img: opened image in cv
+    :param x: x-th coordinate of the feature
+    :param y: y-th coordinate of the feature
+    :param crop_size: The size to crop around the feature from each direction. 50 by default.
+    :return: the cropped image, new x and y (the pixels of the same feature in the cropped image)
+    """
+    up_y = int(max(0, y - crop_size))
+    down_y = int(min(len(img), y + crop_size))
+    left_x = int(max(x - crop_size, 0))
+    right_x = int(min(x + crop_size, len(img[0])))
     img = img[up_y:down_y, left_x:right_x]
-    new_x = min(x, 50)
-    new_y = min(y, 50)
+    new_x = min(x, crop_size)
+    new_y = min(y, crop_size)
     return img, new_x, new_y
 
 
 def show_feature_track(db, num_frames):
+    """
+    Choose random track in len of num_frames at least, create and save an image, that shows the feature
+    the first 10 frames of the track.
+    :param db: database
+    :param num_frames: track length at least to choose
+    """
     track = db.get_random_track_in_len(num_frames)
     if track is None:
         raise "there is no track in length >= num_frames"
@@ -57,6 +72,11 @@ def show_feature_track(db, num_frames):
 
 
 def connectivity_graph(db):
+    """
+    Create and save a connectivity graph from the dataa base
+    (For each frame, the number of tracks outgoing to the next frame)
+    :param db: database
+    """
     frames_num = db.get_frames_number()
     outgoing_frames = np.empty(frames_num)
     for i in range(frames_num):
@@ -67,6 +87,13 @@ def connectivity_graph(db):
 
 
 def inliers_percentage_graph(db):
+    """
+    Create and save inliers percentage graph -
+    for each frame, the percentage of inliers out of all the features that were matched.
+    Note: only inliers were been saved in the db, then, inliers percentage were calculated
+    and saved before removing outliers
+    :param db: database
+    """
     frames_num = db.get_frames_number()
     inliers_percentage = np.empty(frames_num)
     for i in range(frames_num):
@@ -77,6 +104,10 @@ def inliers_percentage_graph(db):
 
 
 def tracks_length_histogram(db):
+    """
+    Create and save tracks length histogram (how many tracks are in a specific length)
+    :param db:
+    """
     tracks_number = db.get_tracks_number()
     tracks_length = np.empty(tracks_number)
     for i in range(tracks_number):
@@ -132,59 +163,40 @@ def reprojection_error(db):
 
 
 def ex4_run():
-    # 4.1
+    # 4.1 Create, fill and serialize the database from the frames images while removing outliers
     db = DataBase()
     db.fill_database(2560)
     db.save_database('C:\\Users\\Miryam\\SLAM\\VAN_ex\\code\\DB\\')
 
-    db2 = DataBase()
-    db2.read_database('C:\\Users\\Miryam\\SLAM\\VAN_ex\\code\\DB\\')
-    db2.save_database('C:\\Users\\Miryam\\SLAM\\VAN_ex\\code\\DB\\', 2)
-
-    # 4.2
+    # 4.2 Present tracking statistics
     print("Total number of tracks: ", db.get_tracks_number())
     print("Number of frames: ", db.get_frames_number())
     mean, max_t, min_t = db.get_mean_max_and_min_track_len()
     print(f"Mean track length: {mean}\nMaximum track length: {max_t}\nMinimum track length: {min_t}")
     print("Mean number of tracks on average frame: ", db.get_mean_number_of_tracks_on_frame())
 
-    # 4.3
+    # 4.3 Present feature for the 1-st 10 images of a track
     show_feature_track(db, 10)
 
-    # 4.4
+    # 4.4 Present a connectivity graph: For each frame, the number of tracks outgoing to the next frame
     connectivity_graph(db)
 
-    # 4.5
+    # 4.5 Present a graph of the percentage of inliers per frame
     inliers_percentage_graph(db)
 
-    # 4.6
+    # 4.6 Present a track length histogram graph
     tracks_length_histogram(db)
 
-    # 4.7
+    # 4.7 Present a graph of the reprojection error size (L2 norm) over the track’s images.
+    # We’ll define the reprojection error for a given camera as the difference between the projection
+    # and the tracked feature location on that camera.
     reprojection_error(db)
 
-    # use the database for localization
+    # use the database for localization (as we did in the previous exercise)
     locations = db.get_camera_locations()
     ground_truth_matrices = utils.read_matrices("C:\\Users\\Miryam\\SLAM\\VAN_ex\\dataset\\poses\\05.txt")
-    real_left_cam_poses = []
-    for mat in ground_truth_matrices:
-        pos = ((-(mat[:, :3]).T @ mat[:, 3]).reshape(1, 3))[0]
-        real_left_cam_poses.append(pos)
-
-    real_left_cam_poses = np.array(real_left_cam_poses)
-    real_x = real_left_cam_poses[:, 0]
-    real_z = real_left_cam_poses[:, 2]
-
-    fig, ax = plt.subplots()
-    ax.scatter(x=real_x, y=real_z, c='tab:orange', label='Ground truth localization', s=0.3, alpha=0.5)
-    ax.scatter(x=locations[:, 0], y=locations[:, 2], label='Our_estimated_localization', s=0.5, alpha=0.7)
-
-    ax.legend()
-
-    plt.title('Estimated vs Real localization')
-    plt.xlabel('x')
-    plt.ylabel('z')
-    plt.savefig(f'{OUTPUT_DIR}localization.png')
+    ground_truth_locations = utils.calculate_ground_truth_locations_from_matrices(ground_truth_matrices)
+    utils.show_localization(locations, ground_truth_locations, f'{OUTPUT_DIR}localization.png')
 
     return 0
 

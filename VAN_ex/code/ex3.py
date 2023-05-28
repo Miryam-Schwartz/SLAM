@@ -219,26 +219,31 @@ def ex3_run():
     x = left_cam_poses[:, 0]
     z = left_cam_poses[:, 2]
 
+    show_localization(left_cam_poses)
+
+
+def show_localization(locations):
+    real_x, real_z = read_ground_truth()
+    fig, ax = plt.subplots()
+    ax.scatter(x=real_x, y=real_z, c='tab:orange', label='Ground truth localization', s=0.3, alpha=0.5)
+    ax.scatter(x=locations[:, 0], y=locations[:, 2], label='Our_estimated_localization', s=0.5, alpha=0.7)
+    ax.legend()
+    plt.title('Estimated vs Real localization')
+    plt.xlabel('x')
+    plt.ylabel('z')
+    plt.savefig(f'{OUTPUT_DIR}localization.png')
+
+
+def read_ground_truth():
     ground_truth_matrices = read_matrices("C:\\Users\\Miryam\\SLAM\\VAN_ex\\dataset\\poses\\05.txt")
     real_left_cam_poses = []
     for mat in ground_truth_matrices:
         pos = ((-(mat[:, :3]).T @ mat[:, 3]).reshape(1, 3))[0]
         real_left_cam_poses.append(pos)
-
     real_left_cam_poses = np.array(real_left_cam_poses)
     real_x = real_left_cam_poses[:, 0]
     real_z = real_left_cam_poses[:, 2]
-
-    fig, ax = plt.subplots()
-    ax.scatter(x=real_x, y=real_z, c='tab:orange', label='Ground truth localization', s=0.3, alpha=0.5)
-    ax.scatter(x=x, y=z, label='Our_estimated_localization', s=0.5, alpha=0.7)
-
-    ax.legend()
-
-    plt.title('Estimated vs Real localization')
-    plt.xlabel('x')
-    plt.ylabel('z')
-    plt.savefig(f'{OUTPUT_DIR}localization.png')
+    return real_x, real_z
 
 
 def plot_supporters_and_unsupporters_on_img(img0_left, supporter_left0, unsupporter_left0, name):
