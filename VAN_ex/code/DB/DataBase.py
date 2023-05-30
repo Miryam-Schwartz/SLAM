@@ -145,6 +145,15 @@ class DataBase:
             sum_tracks += frame.get_number_of_tracks()
         return sum_tracks / self.get_frames_number()
 
+    def set_initial_camera(self, k, m_left, m_right):
+        Frame.k = k
+        Frame.m_left = m_left
+        Frame.m_right = m_right
+        Frame.INDENTATION_RIGHT_CAM_MAT = m_right[0][3]
+
+    def get_initial_camera(self):
+        return Frame.k, Frame.INDENTATION_RIGHT_CAM_MAT
+
     # ================ Tracking ================ #
 
     def fill_database(self, frame_number):
