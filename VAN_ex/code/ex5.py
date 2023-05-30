@@ -3,20 +3,18 @@ import numpy as np
 import utils
 from DB.DataBase import DataBase
 
-def invert_extrinsic_matrix(extrinsic_mat):
+def invert_extrinsic_matrix(r_mat, t_vec):
     #origin extrinsic_mat take world coordinate -> return camera/pose coordinate
     #new extrinsic_mat (used by gtsam) take camera/pose coordinate -> return world coordinate
-    r_mat, t_vec = extrinsic_mat[:, :3], extrinsic_mat[: 3]
     new_t_vec = -np.transpose(r_mat) @ t_vec
     new_r_mat = r_mat.T
-    return np.hstack((new_r_mat, new_t_vec))
+    return new_r_mat, new_t_vec
 
 def reprojection_error_gtsam(db):
     track = db.get_random_track_in_len(10)
     frames_cameras = []
     last_frame_id, last_kp_idx = track.get_last_frame_id_and_kp_idx()
     frames_dict = track.get_frames_dict()
-
     is_first_frame = True
     k, identation_right_cam = db.get_initial_camera()
     K = gtsam.Cal3_S2Stereo(k[0][0], k[1][1], k[0][1], k[0][2], k[1][2], -identation_right_cam)
@@ -26,13 +24,22 @@ def reprojection_error_gtsam(db):
         if is_first_frame:
             is_first_frame = False
         else:
-            mat = db.get_frame_obj(frame_id).
-            concat_r = cur_r @ concat_r
-            concat_t = @concat_t
-        new_r, new_t =
-        cur_pos3 =
-        cur_streo_camera =
-        frames_cameras.append()
+            mat = db.get_frame_obj(frame_id).get_left_camera_pose_mat()
+            concat_r = mat[:, :3] @ concat_r   # in coordinates of first frame of track
+            concat_t = mat[:, :3] @ concat_t + mat[:, 3]
+        inv_r, inv_t = invert_extrinsic_matrix(concat_r, concat_t)
+        cur_pos3 = gtsam.Pose3(np.hstack((inv_r, inv_t.reshape(3, 1))))
+        cur_stereo_camera = gtsam.StreoCamera(cur_pos3, K)
+        frames_cameras.append(cur_stereo_camera)
+
+    last_frame_camera = frames_cameras[-1]
+    left_pixel, right_pixel = db.get_frame_obj(last_frame_id).get_feature_pixels(last_kp_idx)
+    x_l, x_r, y = left_pixel[0], right_pixel[0], (left_pixel[1] + right_pixel[1])/2
+    pt_3d = last_frame_camera.backproject(gtsam.StereoPoint2(x_l, x_r, y))   # in coordinates of last frame
+    # todo- check which object is returned from backproject
+    world_coor_3d_pt = concat_r.T @ (pt_3d - concat_t)
+    for cam_frame in frames_cameras:
+        pt_2d = cam_frame.project(world_coor_3d_pt)
 
 
 

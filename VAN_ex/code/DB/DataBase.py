@@ -409,7 +409,7 @@ class DataBase:
                     self._dict_matches_between_frames[(first_frame_id, second_frame_id)] \
                         .append((first_idx_kp, second_idx_kp))
 
-    def _read_left_camera_location(self, path):
+    def _read_left_camera_poses(self, path):
         with open(path, 'r') as f:
             csvreader = csv.reader(f)
             next(csvreader)
