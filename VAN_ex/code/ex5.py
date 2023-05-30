@@ -36,7 +36,8 @@ def reprojection_error_gtsam(db):
     left_pixel, right_pixel = db.get_frame_obj(last_frame_id).get_feature_pixels(last_kp_idx)
     x_l, x_r, y = left_pixel[0], right_pixel[0], (left_pixel[1] + right_pixel[1])/2
     pt_3d = last_frame_camera.backproject(gtsam.StereoPoint2(x_l, x_r, y))   # in coordinates of last frame
-    # todo- check which object is returned from backproject
+    # todo- check which object is returned from backproject -
+    #  no need to do that! pt_3d is returened in world coors because the frame is in world coor
     world_coor_3d_pt = concat_r.T @ (pt_3d - concat_t)
     for cam_frame in frames_cameras:
         pt_2d = cam_frame.project(world_coor_3d_pt)
