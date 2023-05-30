@@ -163,6 +163,7 @@ def reprojection_error(db):
 
 
 def ex4_run():
+
     # 4.1 Create, fill and serialize the database from the frames images while removing outliers
     db = DataBase()
     db.fill_database(2560)
