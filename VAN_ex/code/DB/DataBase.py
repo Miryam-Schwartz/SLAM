@@ -109,9 +109,15 @@ class DataBase:
         """
         :return: np.Array with all camera locations of all frames
         """
+        concat_r, concat_t = np.identity(3), np.zeros(3)
         locations = np.empty((self.get_frames_number(), 3))
         for frame_id, frame_obj in self._frames_dict.items():
-            locations[frame_id] = frame_obj.get_left_camera_location()
+            pose_mat = frame_obj.get_left_camera_pose_mat()
+            cur_r, cur_t = pose_mat[:, :3], pose_mat[:, 3]
+            concat_r = cur_r @ concat_r
+            concat_t = cur_r @ concat_t + cur_t
+            left_cam_location = ((-concat_r.T @ concat_t).reshape(1, 3))[0]
+            locations[frame_id] = left_cam_location
         return locations
 
     # ================ Tracking Statistics ================ #
@@ -165,7 +171,8 @@ class DataBase:
         self._frames_dict[frame_id] = frame
         if frame_id == 0:
             frame.set_inliers_percentage(100)
-            frame.set_left_camera_location(np.zeros(3))
+            pose0 = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]])
+            frame.set_left_camera_pose_mat(pose0)
         else:
             self._update_tracks(frame_id - 1, frame_id)
 
@@ -187,15 +194,16 @@ class DataBase:
         extrinsic_camera_mat_second_frame_left, matches, inliers_percentage = \
             self.RANSAC(first_frame_id, second_frame_id, matches)
 
-        cur_r = extrinsic_camera_mat_second_frame_left[:, :3]
-        cur_t = extrinsic_camera_mat_second_frame_left[:, 3]
-        self._find_cam_location_and_concat_mats(second_frame_id, cur_r, cur_t)
+        # cur_r = extrinsic_camera_mat_second_frame_left[:, :3]
+        # cur_t = extrinsic_camera_mat_second_frame_left[:, 3]
+        # self._find_cam_location_and_concat_mats(second_frame_id, cur_r, cur_t)
 
         self._dict_matches_between_frames[(first_frame_id, second_frame_id)] = matches
 
         first_frame = self._frames_dict[first_frame_id]
         second_frame = self._frames_dict[second_frame_id]
         second_frame.set_inliers_percentage(inliers_percentage)
+        second_frame.set_left_camera_pose_mat(extrinsic_camera_mat_second_frame_left)
 
         for first_idx_kp_left, second_idx_kp_left in matches:
             is_exist_track = False
@@ -213,11 +221,11 @@ class DataBase:
                 second_frame.add_track(new_track)
                 self._tracks_dict[new_track.get_id()] = new_track
 
-    def _find_cam_location_and_concat_mats(self, second_frame_id, cur_r, cur_t):
-        self._concat_r = cur_r @ self._concat_r
-        self._concat_t = cur_r @ self._concat_t + cur_t
-        left_cam_location = ((-self._concat_r.T @ self._concat_t).reshape(1, 3))[0]
-        self._frames_dict[second_frame_id].set_left_camera_location(left_cam_location)
+    # def _find_cam_location_and_concat_mats(self, second_frame_id, cur_r, cur_t):
+    #     self._concat_r = cur_r @ self._concat_r
+    #     self._concat_t = cur_r @ self._concat_t + cur_t
+    #     left_cam_location = ((-self._concat_r.T @ self._concat_t).reshape(1, 3))[0]
+    #     self._frames_dict[second_frame_id].set_left_camera_location(left_cam_location)
 
     def RANSAC(self, first_frame_id, second_frame_id, matches):
         p, eps = 0.99, 0.99  # eps = prob to be outlier
@@ -293,7 +301,7 @@ class DataBase:
         self._save_tracks(f'{path}tracks{db_id}.csv')
         self._save_match_in_frame(f'{path}match_in_frame{db_id}.csv')
         self._save_match_between_frames(f'{path}match_between_frames{db_id}.csv')
-        self._save_left_camera_locations(f'{path}left_camera_locations{db_id}.csv')
+        self._save_left_camera_poses(f'{path}left_camera_poses{db_id}.csv')
 
     def _save_tracks(self, path):
         header = ['track_id', 'frame_id', 'idx_kp']
@@ -327,14 +335,15 @@ class DataBase:
                     row = [first_frame_id, second_frame_id, first_idx_kp, second_idx_kp]
                     writer.writerow(row)
 
-    def _save_left_camera_locations(self, path):
-        header = ['frame_id', 'x', 'y', 'z']
+    def _save_left_camera_poses(self, path):
+        header = ['frame_id', 'm00', 'm01', 'm02', 'm03', 'm10', 'm11', 'm12', 'm13', 'm20', 'm21', 'm22', 'm23', ]
         with open(path, 'w', encoding='UTF8', newline='') as f:
             writer = csv.writer(f)
             writer.writerow(header)
             for frame_id, frame in self._frames_dict.items():
-                location = frame.get_left_camera_location()
-                row = [frame_id, location[0], location[1], location[2]]
+                pose_mat = frame.get_left_camera_pose_mat()
+                row = [frame_id]
+                row.extend(list(pose_mat.flatten()))
                 writer.writerow(row)
 
     def read_database(self, path, db_id=''):
@@ -343,7 +352,7 @@ class DataBase:
         self._read_tracks(f'{path}tracks{db_id}.csv')
         self._read_match_in_frame(f'{path}match_in_frame{db_id}.csv')
         self._read_match_between_frames(f'{path}match_between_frames{db_id}.csv')
-        self._read_left_camera_location(f'{path}left_camera_locations{db_id}.csv')
+        self._read_left_camera_poses(f'{path}left_camera_poses{db_id}.csv')
         # assume that the db will not be extended (descriptors are not been saved)
         # inliers percentage are also not been saved
 
@@ -396,6 +405,9 @@ class DataBase:
             csvreader = csv.reader(f)
             next(csvreader)
             for row in csvreader:
-                frame_id, x, y, z = int(row[0]), float(row[1]), float(row[2]), float(row[3])
+                frame_id, row = int(row[0]), row[1:]
+                row = np.array(row)
+                row = row.reshape((3, 4))
+                # frame_id, x, y, z = int(row[0]), float(row[1]), float(row[2]), float(row[3])
                 # assume frames_dict is full
-                self._frames_dict[frame_id].set_left_camera_location(np.array([x, y, z]))
+                self._frames_dict[frame_id].set_left_camera_pose_mat(row)

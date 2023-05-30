@@ -25,8 +25,8 @@ class Frame:
             Key is track_id, and value is the track object.
         _inliers_percentage: float
              The percentage of inliers out of all the features that were matched to this frame.
-        _left_camera_location: np.array
-            [x,y,z] represents the location of left camera of this frame, in relation to the initial position.
+        _left_camera_pose_mat: np.Array
+            left camera matrix, in relation to the previous frame.
 
 
         Static
@@ -47,7 +47,8 @@ class Frame:
         self._des_left = des_left
         self._tracks_dict = dict()  # key = track_id, val = track object
         self._inliers_percentage = None
-        self._left_camera_location = None  # in left0 coordinates system
+        # self._left_camera_location = None  # in left0 coordinates system
+        self._left_camera_pose_mat = None
 
     def get_tracks_dict(self):
         return self._tracks_dict
@@ -60,7 +61,7 @@ class Frame:
         calculate by triangulation, the location of the 3-d object in the world,
         according to this frame coordinates system
         :param kp_idx: the index of the keypoint to triangulate
-        :return: 3-d point
+        :return: 3-d point in coordinates of current frame
         """
         pt_4d = utils.triangulation_single_match \
             (Frame.k @ Frame.m_left, Frame.k @ Frame.m_right, self._kp_left[kp_idx], self._kp_right[kp_idx])
@@ -93,10 +94,15 @@ class Frame:
                 counter += 1
         return counter
 
-    def get_left_camera_location(self):
-        if self._left_camera_location is None:
-            raise "location is None"
-        return self._left_camera_location
+    # def get_left_camera_location(self):
+    #     if self._left_camera_location is None:
+    #         raise "location is None"
+    #     return self._left_camera_location
+
+    def get_left_camera_pose_mat(self):
+        if self._left_camera_pose_mat is None:
+            raise "pse is None"
+        return self._left_camera_pose_mat
 
     def get_inliers_percentage(self):
         if self._inliers_percentage is None:
@@ -106,8 +112,11 @@ class Frame:
     def set_inliers_percentage(self, percentage):
         self._inliers_percentage = percentage
 
-    def set_left_camera_location(self, location):
-        self._left_camera_location = location
+    # def set_left_camera_location(self, location):
+    #     self._left_camera_location = location
+
+    def set_left_camera_pose_mat(self, pose_mat):
+        self._left_camera_pose_mat = pose_mat
 
     def add_track(self, new_track):
         """
