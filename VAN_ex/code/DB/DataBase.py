@@ -157,6 +157,8 @@ class DataBase:
     # ================ Tracking ================ #
 
     def fill_database(self, frame_number):
+        k, m_left, m_right = utils.read_cameras()
+        self.set_initial_camera(k, m_left, m_right)
         for i in range(frame_number):
             print(f'---- frame iteration {i}----')
             left_kp, left_des, right_kp, right_des = DataBase._match_in_frame(i)
@@ -358,6 +360,8 @@ class DataBase:
     def read_database(self, path, db_id=''):
         # assume database is empty
         assert (self.get_frames_number() == 0 and self.get_tracks_number() == 0)
+        k, m_left, m_right = utils.read_cameras()
+        self.set_initial_camera(k, m_left, m_right)
         self._read_tracks(f'{path}tracks{db_id}.csv')
         self._read_match_in_frame(f'{path}match_in_frame{db_id}.csv')
         self._read_match_between_frames(f'{path}match_between_frames{db_id}.csv')
@@ -415,6 +419,7 @@ class DataBase:
             next(csvreader)
             for row in csvreader:
                 frame_id, row = int(row[0]), row[1:]
+                row = [float(n) for n in row]
                 row = np.array(row)
                 row = row.reshape((3, 4))
                 # frame_id, x, y, z = int(row[0]), float(row[1]), float(row[2]), float(row[3])
