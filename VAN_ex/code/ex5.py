@@ -95,6 +95,14 @@ def reprojection_error_gtsam(db):
                       xaxis_title='Frame id', yaxis_title='Reprojection error')
     fig.write_image(f"{OUTPUT_DIR}reprojection_error.png")
 
+    factor_err_as_func_reproj_err(track.get_id(), factor_error, reprojection_error)
+
+def factor_err_as_func_reproj_err(track_id, factor_err, reproj_err):
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=reproj_err, y=factor_err, mode='lines+markers'))
+    fig.update_layout(title=f"Factor err as a function of the reprojection error over track {track_id} images",
+                      xaxis_title='Reprojection err', yaxis_title='Factor err')
+    fig.write_image(f"{OUTPUT_DIR}factor_err_of_reproj_err.png")
 
 def run_ex5():
     db = DataBase()
