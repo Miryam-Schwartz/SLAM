@@ -1,3 +1,6 @@
+.idea/
+VAN_ex/dataset/
+
 *.pyc
 *.csv
 *.zip
