@@ -1,4 +1,5 @@
 import cv2 as cv
+import gtsam
 import numpy as np
 # from matplotlib import pyplot as plt
 # import plotly.graph_objs as go
@@ -14,8 +15,8 @@ def read_images(idx):
     :return: left and right cameras photos
     """
     img_name = '{:06d}.png'.format(idx)
-    img1 = cv.imread(DATA_PATH + 'image_0\\' + img_name, 0)
-    img2 = cv.imread(DATA_PATH + 'image_1\\' + img_name, 0)
+    img1 = cv.imread(DATA_PATH + 'image_0/' + img_name, 0)
+    img2 = cv.imread(DATA_PATH + 'image_1/' + img_name, 0)
     return img1, img2
 
 
@@ -247,3 +248,15 @@ def show_localization(estimated_locations, ground_truth_locations, output_path):
     plt.xlabel('x')
     plt.ylabel('z')
     plt.savefig(output_path)
+
+def invert_extrinsic_matrix(r_mat, t_vec):
+    # origin extrinsic_mat take world coordinate -> return camera/pose coordinate
+    # new extrinsic_mat (used by gtsam) take camera/pose coordinate -> return world coordinate
+    new_t_vec = -np.transpose(r_mat) @ t_vec
+    new_r_mat = r_mat.T
+    return new_r_mat, new_t_vec
+
+def get_stereo_point2(db, frame_id, kp_idx):
+    left_pixel, right_pixel = db.get_frame_obj(frame_id).get_feature_pixels(kp_idx)
+    x_l, x_r, y = left_pixel[0], right_pixel[0], (left_pixel[1] + right_pixel[1]) / 2
+    return gtsam.StereoPoint2(x_l, x_r, y)
