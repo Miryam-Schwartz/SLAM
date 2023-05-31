@@ -9,6 +9,7 @@ POINT_SYMBOL = 'q'
 
 
 
+
 class BundleWindow:
     k, m_left, m_right = utils.read_cameras()
     indentation_right_cam = m_right[0][3]
