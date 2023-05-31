@@ -1,6 +1,8 @@
 .idea/
 VAN_ex/dataset/
+VAN_ex/code/DB/__pycache__/
+VAN_ex/code/__pycache__/
 
-
+*.pyc
 *.csv
 *.zip
