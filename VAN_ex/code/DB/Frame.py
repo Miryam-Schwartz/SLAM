@@ -37,8 +37,8 @@ class Frame:
             the indentation between left and right camera in every frame
         """
 
-    k, m_left, m_right = utils.read_cameras()
-    INDENTATION_RIGHT_CAM_MAT = m_right[0][3]
+    k, m_left, m_right = None, None, None
+    INDENTATION_RIGHT_CAM_MAT = None
 
     def __init__(self, frame_id, kp_left, kp_right, des_left):
         self._frame_id = frame_id
