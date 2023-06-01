@@ -151,9 +151,6 @@ class DataBase:
         Frame.m_right = m_right
         Frame.INDENTATION_RIGHT_CAM_MAT = m_right[0][3]
 
-    def get_initial_camera(self):
-        return Frame.k, Frame.INDENTATION_RIGHT_CAM_MAT
-
     # ================ Tracking ================ #
 
     def fill_database(self, frame_number):

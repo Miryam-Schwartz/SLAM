@@ -39,33 +39,16 @@ def show_pixels_before_and_after_optimize(frame_id, track_id, measurement_pixel,
 
 def reprojection_error_gtsam(db):
     track = db.get_random_track_in_len(10)
-    track_len = track.get_track_len()
-    frames_cameras = []
-    real_pts_2d = []
-    last_frame_id, last_kp_idx = track.get_last_frame_id_and_kp_idx()
-    frames_dict = track.get_frames_dict()
-    is_first_frame = True
-    k, identation_right_cam = db.get_initial_camera()
-    K = gtsam.Cal3_S2Stereo(k[0][0], k[1][1], k[0][1], k[0][2], k[1][2], -identation_right_cam)
-    concat_r = np.identity(3)
-    concat_t = np.zeros(3)
-    for frame_id, kp_idx in frames_dict.items():
-        if is_first_frame:
-            is_first_frame = False
-        else:
-            mat = db.get_frame_obj(frame_id).get_left_camera_pose_mat()
-            concat_r = mat[:, :3] @ concat_r  # in coordinates of first frame of track
-            concat_t = mat[:, :3] @ concat_t + mat[:, 3]
-        inv_r, inv_t = utils.invert_extrinsic_matrix(concat_r, concat_t)
-        cur_pos3 = gtsam.Pose3(np.hstack((inv_r, inv_t.reshape(3, 1))))
-        cur_stereo_camera = gtsam.StereoCamera(cur_pos3, K)
-        frames_cameras.append(cur_stereo_camera)
-        real_pts_2d.append(utils.get_stereo_point2(db, frame_id, kp_idx))
+    frames_cameras, real_pts_2d = create_frames_cameras_and_pixels_from_track(db, track)
 
+    track_len = track.get_track_len()
     last_frame_camera = frames_cameras[-1]
-    last_frame_pt_2d = utils.get_stereo_point2(db, last_frame_id, last_kp_idx)
+    # last_frame_id, last_kp_idx = track.get_last_frame_id_and_kp_idx()
+    # last_frame_pt_2d = utils.get_stereo_point2(db, last_frame_id, last_kp_idx)
+    last_frame_pt_2d = real_pts_2d[-1]
     # triangulation - 3d_pt in coordinates of first frame in track
     pt_3d = last_frame_camera.backproject(last_frame_pt_2d)
+    # todo - seperate to error in left and right?
     reprojection_error = np.empty(track_len)
     factor_error = np.empty(track_len)
     cov = gtsam.noiseModel.Isotropic.Sigma(3, 1.0)
@@ -84,7 +67,7 @@ def reprojection_error_gtsam(db):
             (pt_2d_real, cov, gtsam.symbol('c', i), gtsam.symbol('q', track.get_id()), K)
         factor_error[i] = factor.error(values)
 
-    frames_arr = np.array(list(frames_dict.keys()))
+    frames_arr = np.array(list(track.get_frames_dict().keys()))
 
     fig = go.Figure()
     fig.add_trace(
@@ -97,6 +80,30 @@ def reprojection_error_gtsam(db):
 
     factor_err_as_func_reproj_err(track.get_id(), factor_error, reprojection_error)
 
+
+def create_frames_cameras_and_pixels_from_track(db, track):
+    frames_cameras = []
+    real_pts_2d = []
+    frames_dict = track.get_frames_dict()
+    K = BundleWindow.create_intrinsic_mat()
+    concat_r = np.identity(3)
+    concat_t = np.zeros(3)
+    is_first_frame = True
+    for frame_id, kp_idx in frames_dict.items():
+        if is_first_frame:
+            is_first_frame = False
+        else:
+            mat = db.get_frame_obj(frame_id).get_left_camera_pose_mat()
+            concat_r = mat[:, :3] @ concat_r  # in coordinates of first frame of track
+            concat_t = mat[:, :3] @ concat_t + mat[:, 3]
+        inv_r, inv_t = utils.invert_extrinsic_matrix(concat_r, concat_t)
+        cur_pos3 = gtsam.Pose3(np.hstack((inv_r, inv_t.reshape(3, 1))))
+        cur_stereo_camera = gtsam.StereoCamera(cur_pos3, K)
+        frames_cameras.append(cur_stereo_camera)
+        real_pts_2d.append(utils.get_stereo_point2(db, frame_id, kp_idx))
+    return frames_cameras, real_pts_2d
+
+
 def factor_err_as_func_reproj_err(track_id, factor_err, reproj_err):
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=reproj_err, y=factor_err, mode='lines+markers'))
@@ -104,16 +111,13 @@ def factor_err_as_func_reproj_err(track_id, factor_err, reproj_err):
                       xaxis_title='Reprojection err', yaxis_title='Factor err')
     fig.write_image(f"{OUTPUT_DIR}factor_err_of_reproj_err.png")
 
+
 def run_ex5():
     db = DataBase()
     db.read_database(utils.DB_PATH)
 
     # 5.1
     reprojection_error_gtsam(db)
-
-    k, identation_right_cam = db.get_initial_camera()
-    print(k)
-    print(identation_right_cam)
 
     # 5.2
     bundle_window = BundleWindow(db, 0, 10)
@@ -129,7 +133,6 @@ def run_ex5():
     print(f"factor error after optimize: {factor_error_after}")
     measurement, before, after = bundle_window.get_pixels_before_and_after_optimize(frame_id, track_id)
     show_pixels_before_and_after_optimize(frame_id, track_id, measurement, before, after)
-    # db.save_database(utils.DB_PATH, 2)
     return 0
 
 

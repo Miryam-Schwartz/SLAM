@@ -8,12 +8,15 @@ CAMERA_SYMBOL = 'c'
 POINT_SYMBOL = 'q'
 
 
-
-
 class BundleWindow:
-    k, m_left, m_right = utils.read_cameras()
-    indentation_right_cam = m_right[0][3]
-    K = gtsam.Cal3_S2Stereo(k[0][0], k[1][1], k[0][1], k[0][2], k[1][2], -indentation_right_cam)
+    @staticmethod
+    def create_intrinsic_mat():
+        k, _, m_right = utils.read_cameras()
+        indentation_right_cam = m_right[0][3]
+        K = gtsam.Cal3_S2Stereo(k[0][0], k[1][1], k[0][1], k[0][2], k[1][2], -indentation_right_cam)
+        return K
+
+    K = create_intrinsic_mat()
 
     def __init__(self, db, first_keyframe_id, last_keyframe_id):
         self._db = db
@@ -21,7 +24,7 @@ class BundleWindow:
         self._last_keyframe_id = last_keyframe_id
         self._tracks = self._init_tracks()  # set of tracks ids of all tracks of window
         self._initial_estimate = self._init_initial_estimate()
-        self._current_values = self._initial_estimate       # before optimization - current values is initial estimate
+        self._current_values = self._initial_estimate  # before optimization - current values is initial estimate
         self._factors = self._init_factors()
         self._graph = self._init_graph()
         self._optimizer = gtsam.LevenbergMarquardtOptimizer(self._graph, self._initial_estimate)
@@ -97,7 +100,7 @@ class BundleWindow:
         self._current_values = self._optimizer.optimize()
         return self._current_values  # returns values object
 
-    def total_factor_error(self):       # returns error of current values
+    def total_factor_error(self):  # returns error of current values
         error = 0
         for factor in self._factors.values():
             error += factor.error(self._current_values)
@@ -119,8 +122,6 @@ class BundleWindow:
         before_pixel = self._project_point(frame_id, track_id, self._initial_estimate)
         after_pixel = self._project_point(frame_id, track_id, self._current_values)
         return measurement_pixel, before_pixel, after_pixel
-
-
 
     def _project_point(self, frame_id, track_id, values):
         pt_3d = values.atPoint3(gtsam.symbol(POINT_SYMBOL, track_id))
