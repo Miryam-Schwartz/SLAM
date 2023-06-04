@@ -7,21 +7,23 @@ import utils
 import plotly.graph_objs as go
 from DB.DataBase import DataBase
 from BundleAdjustment.BundleWindow import BundleWindow
+import BundleAdjustment.BundleWindow
 
 OUTPUT_DIR = 'results/ex5/'
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
 def _add_pixels(grid, measurement_pixel, color, label):
-    grid[0].scatter(measurement_pixel[0], measurement_pixel[2], s=1, c=color)
-    grid[1].scatter(measurement_pixel[1], measurement_pixel[2], s=1, c=color, label=label)
+    grid[0].scatter(measurement_pixel[0], measurement_pixel[2], s=15, c=color, label=label)
+    grid[1].scatter(measurement_pixel[1], measurement_pixel[2], s=15, c=color, label=label)
 
 
 def show_pixels_before_and_after_optimize(frame_id, track_id, measurement_pixel, before_pixel, after_pixel):
     fig, grid = plt.subplots(1, 2)
-    fig.set_figwidth(20)
-    fig.set_figheight(10)
-    fig.suptitle(f"Track {track_id}, in frame {frame_id}")
+    fig.set_figwidth(25)
+    fig.set_figheight(4)
+    fig.suptitle(f"Track {track_id}, in frame {frame_id}", size='xx-large')
+    # fig.update_layout(font=dict(size=18))
     grid[0].set_title("Left")
     grid[1].set_title("Right")
     img_left, img_right = utils.read_images(frame_id)
@@ -35,6 +37,7 @@ def show_pixels_before_and_after_optimize(frame_id, track_id, measurement_pixel,
     _add_pixels(grid, before_pixel, "b", "before_optimize")
     _add_pixels(grid, after_pixel, "g", "after_optimize")
     fig.savefig(f'{OUTPUT_DIR}compare_pixel_projections.png')
+    # todo - check how to output it better
 
 
 def reprojection_error_gtsam(db):
@@ -64,7 +67,7 @@ def reprojection_error_gtsam(db):
         reprojection_error[i] = np.linalg.norm(diff)  # todo - check what is the factor error
 
         factor = gtsam.GenericStereoFactor3D \
-            (pt_2d_real, cov, gtsam.symbol('c', i), gtsam.symbol('q', track.get_id()), K)
+            (pt_2d_real, cov, gtsam.symbol('c', i), gtsam.symbol('q', track.get_id()), BundleWindow.K)
         factor_error[i] = factor.error(values)
 
     frames_arr = np.array(list(track.get_frames_dict().keys()))
@@ -85,7 +88,7 @@ def create_frames_cameras_and_pixels_from_track(db, track):
     frames_cameras = []
     real_pts_2d = []
     frames_dict = track.get_frames_dict()
-    K = BundleWindow.create_intrinsic_mat()
+    K = BundleAdjustment.BundleWindow.create_intrinsic_mat()
     concat_r = np.identity(3)
     concat_t = np.zeros(3)
     is_first_frame = True
@@ -133,6 +136,10 @@ def run_ex5():
     print(f"factor error after optimize: {factor_error_after}")
     measurement, before, after = bundle_window.get_pixels_before_and_after_optimize(frame_id, track_id)
     show_pixels_before_and_after_optimize(frame_id, track_id, measurement, before, after)
+
+    bundle_window.plot_3d_positions_graph(f'{OUTPUT_DIR}resulting_3d_positions.png')
+    bundle_window.plot_2d_positions_graph(f'{OUTPUT_DIR}resulting_2d_positions.png')
+
     return 0
 
 

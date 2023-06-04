@@ -2,20 +2,23 @@ import random
 
 import gtsam
 import numpy as np
+from matplotlib import pyplot as plt
+
 from VAN_ex.code import utils
+from gtsam.utils import plot
 
 CAMERA_SYMBOL = 'c'
 POINT_SYMBOL = 'q'
 
 
-class BundleWindow:
-    @staticmethod
-    def create_intrinsic_mat():
-        k, _, m_right = utils.read_cameras()
-        indentation_right_cam = m_right[0][3]
-        K = gtsam.Cal3_S2Stereo(k[0][0], k[1][1], k[0][1], k[0][2], k[1][2], -indentation_right_cam)
-        return K
+def create_intrinsic_mat():
+    k, _, m_right = utils.read_cameras()
+    indentation_right_cam = m_right[0][3]
+    K = gtsam.Cal3_S2Stereo(k[0][0], k[1][1], k[0][1], k[0][2], k[1][2], -indentation_right_cam)
+    return K
 
+
+class BundleWindow:
     K = create_intrinsic_mat()
 
     def __init__(self, db, first_keyframe_id, last_keyframe_id):
@@ -130,3 +133,34 @@ class BundleWindow:
         proj = cam.project(pt_3d)
         pixel = np.array([proj.uL(), proj.uR(), proj.v()])
         return pixel
+
+    def plot_3d_positions_graph(self, output_path):
+        gtsam.utils.plot.plot_trajectory(fignum=0, values=self._current_values,
+                                         title=f'Estimated pose for frames {self._first_keyframe_id} - {self._last_keyframe_id}',
+                                         save_file=output_path)
+    def plot_2d_positions_graph(self, output_path):
+        x_poses = np.empty(self._last_keyframe_id - self._first_keyframe_id + 1)
+        z_poses = np.empty(self._last_keyframe_id - self._first_keyframe_id + 1)
+        for i, frame_id in enumerate(range(self._first_keyframe_id, self._last_keyframe_id + 1)):
+            pose3 = self._current_values.atPose3(gtsam.symbol(CAMERA_SYMBOL, frame_id))
+            x_poses[i] = pose3.x()
+            z_poses[i] = pose3.z()
+        x_points = np.empty(len(self._tracks))
+        z_points = np.empty(len(self._tracks))
+        for i, track_id in enumerate(self._tracks):
+            point3 = self._current_values.atPoint3(gtsam.symbol(POINT_SYMBOL, track_id))
+            x_points[i] = point3[0]
+            z_points[i] = point3[2]
+
+        fig, ax = plt.subplots()
+        ax.scatter(x=x_poses, y=z_poses,
+                   c='tab:blue', label='Cameras positions', s=0.3, alpha=0.5)
+        ax.scatter(x=x_points, y=z_points,
+                   c='tab:orange', label='Points', s=0.5, alpha=0.7)
+        ax.set_ylim(0, 200)
+        ax.legend()
+        plt.title('Cameras & Points - View from above')
+        plt.xlabel('x')
+        plt.ylabel('z')
+        plt.savefig(output_path)
+
