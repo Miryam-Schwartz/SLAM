@@ -11,17 +11,16 @@ CAMERA_SYMBOL = 'c'
 POINT_SYMBOL = 'q'
 
 
-def create_intrinsic_mat():
-    k, _, m_right = utils.read_cameras()
-    indentation_right_cam = m_right[0][3]
-    K = gtsam.Cal3_S2Stereo(k[0][0], k[1][1], k[0][1], k[0][2], k[1][2], -indentation_right_cam)
-    return K
+
 
 
 class BundleWindow:
-    K = create_intrinsic_mat()
+    k, _, m_right = utils.read_cameras()
+    indentation_right_cam = m_right[0][3]
+    K = gtsam.Cal3_S2Stereo(k[0][0], k[1][1], k[0][1], k[0][2], k[1][2], -indentation_right_cam)
 
     def __init__(self, db, first_keyframe_id, last_keyframe_id):
+        # print(f'window {first_keyframe_id} - {last_keyframe_id}')
         self._db = db
         self._first_keyframe_id = first_keyframe_id
         self._last_keyframe_id = last_keyframe_id
@@ -29,7 +28,7 @@ class BundleWindow:
         self._initial_estimate = self._init_initial_estimate()
         self._current_values = self._initial_estimate  # before optimization - current values is initial estimate
         self._factors = self._init_factors()
-        self._prior_factor = gtsam.PriorFactorPose3(gtsam.symbol(CAMERA_SYMBOL, 0), gtsam.Pose3(), gtsam.noiseModel.Unit.Create(6))
+        self._prior_factor = gtsam.PriorFactorPose3(gtsam.symbol(CAMERA_SYMBOL, first_keyframe_id), gtsam.Pose3(), gtsam.noiseModel.Unit.Create(6))
         self._graph = self._init_graph()
         self._optimizer = gtsam.LevenbergMarquardtOptimizer(self._graph, self._initial_estimate)
 
@@ -78,14 +77,15 @@ class BundleWindow:
     def _init_factors(self):
         factors = dict()
         cov = gtsam.noiseModel.Isotropic.Sigma(3, 1.0)
+
         for track_id in self._tracks:
             track_obj = self._db.get_track_obj(track_id)
             frames_dict = track_obj.get_frames_dict()
             for frame_id, kp_idx in frames_dict.items():
-                if frame_id > self._last_keyframe_id:
-                    break
+                if frame_id > self._last_keyframe_id or frame_id < self._first_keyframe_id:
+                    continue
                 pt_2d_real = utils.get_stereo_point2(self._db, frame_id, kp_idx)
-
+                # print(f"add factor : frame_id-{frame_id}, track_id-{track_id}")
                 factor = gtsam.GenericStereoFactor3D \
                     (pt_2d_real, cov, gtsam.symbol(CAMERA_SYMBOL, frame_id), gtsam.symbol(POINT_SYMBOL, track_id),
                      BundleWindow.K)
@@ -100,6 +100,7 @@ class BundleWindow:
         return graph
 
     def _init_initial_estimate_points(self, values):
+        updated_tracks = set()
         for track_id in self._tracks:
             track_obj = self._db.get_track_obj(track_id)
             last_frame_id, _ = track_obj.get_last_frame_id_and_kp_idx()
@@ -109,9 +110,18 @@ class BundleWindow:
             last_kp_idx = track_obj.get_kp_idx_of_frame(last_frame_id)
             pt_2d = utils.get_stereo_point2(self._db, last_frame_id, last_kp_idx)
             pt_3d = last_frame_stereo_cam.backproject(pt_2d)
-            values.insert(gtsam.symbol(POINT_SYMBOL, track_id), pt_3d)
+
+            if pt_3d[2] <= 0 or pt_3d[2] >= 300:
+                continue
+            else:
+                values.insert(gtsam.symbol(POINT_SYMBOL, track_id), pt_3d)
+                updated_tracks.add(track_id)
+        self._tracks = updated_tracks
 
     def optimize(self):
+        # print(len(self._tracks))
+        # print(len(self._factors.keys()))
+        # print(len(self._current_values.keys()))
         self._current_values = self._optimizer.optimize()
         return self._current_values  # returns values object
 

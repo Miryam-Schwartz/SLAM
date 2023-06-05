@@ -6,12 +6,23 @@ from matplotlib import pyplot as plt
 import utils
 import plotly.graph_objs as go
 from DB.DataBase import DataBase
-from BundleAdjustment.BundleWindow import BundleWindow
-import BundleAdjustment.BundleWindow
+# from Bundle import BundleWindow
+from Bundle.BundleAdjustment import BundleAdjustment
+# import Bundle
+# from Bundle.BundleWindow import BundleWindow
+# import Bundle.BundleWindow
+# from Bundle.Bundle import Bundle
+# from Bundle import BundleWindow
+from VAN_ex.code.Bundle.BundleWindow import BundleWindow
 
 OUTPUT_DIR = 'results/ex5/'
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+def create_intrinsic_mat():
+    k, _, m_right = utils.read_cameras()
+    indentation_right_cam = m_right[0][3]
+    K = gtsam.Cal3_S2Stereo(k[0][0], k[1][1], k[0][1], k[0][2], k[1][2], -indentation_right_cam)
+    return K
 
 def _add_pixels(grid, measurement_pixel, color, label):
     grid[0].scatter(measurement_pixel[0], measurement_pixel[2], s=15, c=color, label=label)
@@ -64,7 +75,7 @@ def reprojection_error_gtsam(db):
         pt_2d_real = real_pts_2d[i]
         diff = pt_2d_real - pt_2d_proj
         diff = np.array([diff.uL(), diff.uR(), diff.v()])
-        reprojection_error[i] = np.linalg.norm(diff)  # todo - check what is the factor error
+        reprojection_error[i] = np.linalg.norm(diff)
 
         factor = gtsam.GenericStereoFactor3D \
             (pt_2d_real, cov, gtsam.symbol('c', i), gtsam.symbol('q', track.get_id()), BundleWindow.K)
@@ -88,7 +99,7 @@ def create_frames_cameras_and_pixels_from_track(db, track):
     frames_cameras = []
     real_pts_2d = []
     frames_dict = track.get_frames_dict()
-    K = BundleAdjustment.BundleWindow.create_intrinsic_mat()
+    K = create_intrinsic_mat()
     concat_r = np.identity(3)
     concat_t = np.zeros(3)
     is_first_frame = True
@@ -140,14 +151,50 @@ def run_ex5():
     bundle_window.plot_3d_positions_graph(f'{OUTPUT_DIR}resulting_3d_positions.png')
     bundle_window.plot_2d_positions_graph(f'{OUTPUT_DIR}resulting_2d_positions.png')
 
-    # print(bundle_window.get_frame_position(0))
-    # print(bundle_window.get_prior_factor_error())
-
     # 5.3
+    ground_truth_matrices = utils.read_matrices("/cs/usr/nava.goetschel/SLAM/VAN_ex/dataset/poses/05.txt")
+    ground_truth_locations = utils.calculate_ground_truth_locations_from_matrices(ground_truth_matrices)
+    alg = BundleAdjustment(2560, 10, db)
+    alg.optimize_all_windows()
+
+    last_window = alg.get_last_window()
+    print("Final position of first frame of last window: ", last_window.get_frame_location(last_window.get_first_keyframe_id()))
+    print("Prior factor error of last window: ", last_window.get_prior_factor_error())
+
+    global_poses = alg.get_global_keyframes_poses()
+    global_locations = BundleAdjustment.from_poses_to_locations(global_poses)
+    global_3d_points = alg.get_global_3d_points(global_poses)
+
+    fig, ax = plt.subplots()
+    ax.scatter(x=global_locations[:, 0], y=global_locations[:, 2],
+               c='tab:blue', label='Keyframes positions', s=3, alpha=1)
+    ax.scatter(x=global_3d_points[:, 0], y=global_3d_points[:, 2],
+               c='tab:orange', label='Points', s=0.1, alpha=0.1)
+    ax.scatter(x=ground_truth_locations[:, 0], y=ground_truth_locations[:, 2],
+               c='tab:green', label='Ground Truth Locations', s=0.5, alpha=0.7)
+    # ax.set_ylim(0, 200)
+    ax.set_ylim(-200, 200)
+    ax.set_xlim(-300, 300)
+    ax.legend()
+    plt.title('Cameras & Points - View from above')
+    plt.xlabel('x')
+    plt.ylabel('z')
+    plt.savefig(f'{OUTPUT_DIR}Key frames after optimization.png')
 
 
+    keyframes = alg.get_keyframes()
+    keyframe_localization_error = np.sum((ground_truth_locations[keyframes] - global_locations)**2, axis=-1)**0.5
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(x=keyframes, y=keyframe_localization_error, mode='lines+markers'))
+    fig.update_layout(title="Keyframe localization error over time",
+                      xaxis_title='Keyframe id', yaxis_title='localization error')
+    fig.write_image(f"{OUTPUT_DIR}localization error over time.png")
 
     return 0
+
+
 
 
 run_ex5()
