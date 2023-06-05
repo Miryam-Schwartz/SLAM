@@ -29,8 +29,22 @@ class BundleWindow:
         self._initial_estimate = self._init_initial_estimate()
         self._current_values = self._initial_estimate  # before optimization - current values is initial estimate
         self._factors = self._init_factors()
+        self._prior_factor = gtsam.PriorFactorPose3(gtsam.symbol(CAMERA_SYMBOL, 0), gtsam.Pose3(), gtsam.noiseModel.Unit.Create(6))
         self._graph = self._init_graph()
         self._optimizer = gtsam.LevenbergMarquardtOptimizer(self._graph, self._initial_estimate)
+
+    def get_first_keyframe_id(self):
+        return self._first_keyframe_id
+
+    def get_last_keyframe_id(self):
+        return self._last_keyframe_id
+
+    def get_points(self):
+        points = []
+        for track_id in self._tracks:
+            pt = self._current_values.atPoint3(gtsam.symbol(POINT_SYMBOL, track_id))
+            points.append(pt)
+        return points
 
     def _init_tracks(self):
         tracks = set()
@@ -82,9 +96,7 @@ class BundleWindow:
         graph = gtsam.NonlinearFactorGraph()
         for factor in self._factors.values():
             graph.add(factor)
-        origin = gtsam.Pose3()
-        sigma6d = gtsam.noiseModel.Unit.Create(6)
-        graph.add(gtsam.PriorFactorPose3(gtsam.symbol(CAMERA_SYMBOL, 0), origin, sigma6d))
+        graph.add(self._prior_factor)
         return graph
 
     def _init_initial_estimate_points(self, values):
@@ -133,6 +145,16 @@ class BundleWindow:
         proj = cam.project(pt_3d)
         pixel = np.array([proj.uL(), proj.uR(), proj.v()])
         return pixel
+
+    def get_frame_location(self, frame_id):
+        pose3 = self._current_values.atPose3(gtsam.symbol(CAMERA_SYMBOL, frame_id))
+        return np.array([pose3.x(), pose3.y(), pose3.z()])
+
+    def get_frame_pose3(self, frame_id):
+        return self._current_values.atPose3(gtsam.symbol(CAMERA_SYMBOL, frame_id))
+
+    def get_prior_factor_error(self):
+        return self._prior_factor.error(self._current_values)
 
     def plot_3d_positions_graph(self, output_path):
         gtsam.utils.plot.plot_trajectory(fignum=0, values=self._current_values,

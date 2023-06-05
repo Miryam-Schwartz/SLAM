@@ -140,6 +140,13 @@ def run_ex5():
     bundle_window.plot_3d_positions_graph(f'{OUTPUT_DIR}resulting_3d_positions.png')
     bundle_window.plot_2d_positions_graph(f'{OUTPUT_DIR}resulting_2d_positions.png')
 
+    # print(bundle_window.get_frame_position(0))
+    # print(bundle_window.get_prior_factor_error())
+
+    # 5.3
+
+
+
     return 0
 
 
