@@ -2,6 +2,7 @@ import os
 import gtsam
 import numpy as np
 from matplotlib import pyplot as plt
+import plotly.express as px
 
 import utils
 import plotly.graph_objs as go
@@ -24,31 +25,52 @@ def create_intrinsic_mat():
     K = gtsam.Cal3_S2Stereo(k[0][0], k[1][1], k[0][1], k[0][2], k[1][2], -indentation_right_cam)
     return K
 
-def _add_pixels(grid, measurement_pixel, color, label):
-    grid[0].scatter(measurement_pixel[0], measurement_pixel[2], s=15, c=color, label=label)
-    grid[1].scatter(measurement_pixel[1], measurement_pixel[2], s=15, c=color, label=label)
+# def _add_pixels(grid, measurement_pixel, color, label):
+#     grid[0].scatter(measurement_pixel[0], measurement_pixel[2], s=15, c=color, label=label)
+#     grid[1].scatter(measurement_pixel[1], measurement_pixel[2], s=15, c=color, label=label)
+
+def _show_pixels_over_image(img, measurement_pixel, before_pixel, after_pixel, side):
+    fig = px.imshow(img, color_continuous_scale='gray')
+    fig.update_traces(dict(showscale=False, coloraxis=None, colorscale='gray'))
+    fig.add_trace(
+        go.Scatter(x=[measurement_pixel[0]], y=[measurement_pixel[1]],
+                   marker=dict(color='red', size=5), name='measurement'))
+    fig.add_trace(
+        go.Scatter(x=[before_pixel[0]], y=[before_pixel[1]],
+                   marker=dict(color='blue', size=5), name='before optimization'))
+    fig.add_trace(
+        go.Scatter(x=[after_pixel[0]], y=[after_pixel[1]],
+                   marker=dict(color='green', size=5), name='after optimization'))
+    fig.update_layout(title=dict(text=f"{side}"))
+    fig.write_html(f'{OUTPUT_DIR}compare_pixel_projections_{side}.html')
 
 
-def show_pixels_before_and_after_optimize(frame_id, track_id, measurement_pixel, before_pixel, after_pixel):
-    fig, grid = plt.subplots(1, 2)
-    fig.set_figwidth(25)
-    fig.set_figheight(4)
-    fig.suptitle(f"Track {track_id}, in frame {frame_id}", size='xx-large')
-    # fig.update_layout(font=dict(size=18))
-    grid[0].set_title("Left")
-    grid[1].set_title("Right")
+
+def show_pixels_before_and_after_optimize(frame_id, measurement_pixel, before_pixel, after_pixel):
     img_left, img_right = utils.read_images(frame_id)
-    grid[0].axes.xaxis.set_visible(False)
-    grid[1].axes.xaxis.set_visible(False)
-    grid[0].axes.yaxis.set_visible(False)
-    grid[1].axes.yaxis.set_visible(False)
-    grid[0].imshow(img_left, cmap="gray", aspect='auto')
-    grid[1].imshow(img_right, cmap="gray", aspect='auto')
-    _add_pixels(grid, measurement_pixel, "r", "measurement")
-    _add_pixels(grid, before_pixel, "b", "before_optimize")
-    _add_pixels(grid, after_pixel, "g", "after_optimize")
-    fig.savefig(f'{OUTPUT_DIR}compare_pixel_projections.png')
-    # todo - check how to output it better
+    _show_pixels_over_image(img_left, measurement_pixel[[0,2]], before_pixel[[0,2]], after_pixel[[0,2]], 'Left')
+    _show_pixels_over_image(img_right, measurement_pixel[[1,2]], before_pixel[[1,2]], after_pixel[[1,2]], 'Right')
+
+# def show_pixels_before_and_after_optimize(frame_id, track_id, measurement_pixel, before_pixel, after_pixel):
+#     fig, grid = plt.subplots(1, 2)
+#     fig.set_figwidth(25)
+#     fig.set_figheight(4)
+#     fig.suptitle(f"Track {track_id}, in frame {frame_id}", size='xx-large')
+#     # fig.update_layout(font=dict(size=18))
+#     grid[0].set_title("Left")
+#     grid[1].set_title("Right")
+#     img_left, img_right = utils.read_images(frame_id)
+#     grid[0].axes.xaxis.set_visible(False)
+#     grid[1].axes.xaxis.set_visible(False)
+#     grid[0].axes.yaxis.set_visible(False)
+#     grid[1].axes.yaxis.set_visible(False)
+#     grid[0].imshow(img_left, cmap="gray", aspect='auto')
+#     grid[1].imshow(img_right, cmap="gray", aspect='auto')
+#     _add_pixels(grid, measurement_pixel, "r", "measurement")
+#     _add_pixels(grid, before_pixel, "b", "before_optimize")
+#     _add_pixels(grid, after_pixel, "g", "after_optimize")
+#     fig.savefig(f'{OUTPUT_DIR}compare_pixel_projections.png')
+#     # todo - check how to output it better
 
 
 def reprojection_error_gtsam(db):
@@ -62,7 +84,8 @@ def reprojection_error_gtsam(db):
     last_frame_pt_2d = real_pts_2d[-1]
     # triangulation - 3d_pt in coordinates of first frame in track
     pt_3d = last_frame_camera.backproject(last_frame_pt_2d)
-    # todo - seperate to error in left and right?
+    reprojection_error_left = np.empty(track_len)
+    reprojection_error_right = np.empty(track_len)
     reprojection_error = np.empty(track_len)
     factor_error = np.empty(track_len)
     cov = gtsam.noiseModel.Isotropic.Sigma(3, 1.0)
@@ -76,6 +99,8 @@ def reprojection_error_gtsam(db):
         diff = pt_2d_real - pt_2d_proj
         diff = np.array([diff.uL(), diff.uR(), diff.v()])
         reprojection_error[i] = np.linalg.norm(diff)
+        reprojection_error_left[i] = np.linalg.norm(diff[[0, 2]])
+        reprojection_error_right[i] = np.linalg.norm(diff[[1, 2]])
 
         factor = gtsam.GenericStereoFactor3D \
             (pt_2d_real, cov, gtsam.symbol('c', i), gtsam.symbol('q', track.get_id()), BundleWindow.K)
@@ -85,7 +110,9 @@ def reprojection_error_gtsam(db):
 
     fig = go.Figure()
     fig.add_trace(
-        go.Scatter(x=frames_arr, y=reprojection_error, mode='lines+markers', name='reprojection error'))
+        go.Scatter(x=frames_arr, y=reprojection_error_right, mode='lines+markers', name='right'))
+    fig.add_trace(
+        go.Scatter(x=frames_arr, y=reprojection_error_left, mode='lines+markers', name='left'))
     fig.add_trace(
         go.Scatter(x=frames_arr, y=factor_error, mode='lines+markers', name='factor error'))
     fig.update_layout(title=f"Reprojection error size (L2 norm) over track {track.get_id()} images",
@@ -146,7 +173,7 @@ def run_ex5():
     print(f"factor error before optimize: {factor_error_before}")
     print(f"factor error after optimize: {factor_error_after}")
     measurement, before, after = bundle_window.get_pixels_before_and_after_optimize(frame_id, track_id)
-    show_pixels_before_and_after_optimize(frame_id, track_id, measurement, before, after)
+    show_pixels_before_and_after_optimize(frame_id, measurement, before, after)
 
     bundle_window.plot_3d_positions_graph(f'{OUTPUT_DIR}resulting_3d_positions.png')
     bundle_window.plot_2d_positions_graph(f'{OUTPUT_DIR}resulting_2d_positions.png')
