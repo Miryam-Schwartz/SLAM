@@ -6,6 +6,7 @@ import numpy as np
 
 DATA_PATH = r'/cs/usr/nava.goetschel/SLAM/VAN_ex/dataset/sequences/05/'
 DB_PATH = r'/cs/usr/nava.goetschel/SLAM/VAN_ex/code/DB/'
+GROUND_TRUTH_PATH = "/cs/usr/nava.goetschel/SLAM/VAN_ex/dataset/poses/05.txt"
 
 
 def read_images(idx):
@@ -218,7 +219,7 @@ def create_hist(data_array, x_label, y_label, title, output_path):
     plt.savefig(output_path)
 
 
-def read_matrices(path):
+def read_ground_truth_matrices(path=GROUND_TRUTH_PATH):
     matrices = []
     with open(path) as f:
         for line in f:

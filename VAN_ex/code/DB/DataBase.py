@@ -145,6 +145,13 @@ class DataBase:
             sum_tracks += frame.get_number_of_tracks()
         return sum_tracks / self.get_frames_number()
 
+    def get_median_track_len(self):
+        lengths = np.empty(len(self._tracks_dict))
+        for i, track in enumerate(self._tracks_dict.values()):
+            track_len = track.get_track_len()
+            lengths[i] = track_len
+        return np.median(lengths)
+
     def set_initial_camera(self, k, m_left, m_right):
         Frame.k = k
         Frame.m_left = m_left

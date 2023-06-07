@@ -3,21 +3,17 @@ import gtsam
 import numpy as np
 from matplotlib import pyplot as plt
 import plotly.express as px
+import plotly.graph_objs as go
 
 import utils
-import plotly.graph_objs as go
 from DB.DataBase import DataBase
-# from Bundle import BundleWindow
 from Bundle.BundleAdjustment import BundleAdjustment
-# import Bundle
-# from Bundle.BundleWindow import BundleWindow
-# import Bundle.BundleWindow
-# from Bundle.Bundle import Bundle
-# from Bundle import BundleWindow
 from VAN_ex.code.Bundle.BundleWindow import BundleWindow
 
 OUTPUT_DIR = 'results/ex5/'
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+WINDOW_LEN = 20
 
 def create_intrinsic_mat():
     k, _, m_right = utils.read_cameras()
@@ -25,64 +21,14 @@ def create_intrinsic_mat():
     K = gtsam.Cal3_S2Stereo(k[0][0], k[1][1], k[0][1], k[0][2], k[1][2], -indentation_right_cam)
     return K
 
-# def _add_pixels(grid, measurement_pixel, color, label):
-#     grid[0].scatter(measurement_pixel[0], measurement_pixel[2], s=15, c=color, label=label)
-#     grid[1].scatter(measurement_pixel[1], measurement_pixel[2], s=15, c=color, label=label)
 
-def _show_pixels_over_image(img, measurement_pixel, before_pixel, after_pixel, side):
-    fig = px.imshow(img, color_continuous_scale='gray')
-    fig.update_traces(dict(showscale=False, coloraxis=None, colorscale='gray'))
-    fig.add_trace(
-        go.Scatter(x=[measurement_pixel[0]], y=[measurement_pixel[1]],
-                   marker=dict(color='red', size=5), name='measurement'))
-    fig.add_trace(
-        go.Scatter(x=[before_pixel[0]], y=[before_pixel[1]],
-                   marker=dict(color='blue', size=5), name='before optimization'))
-    fig.add_trace(
-        go.Scatter(x=[after_pixel[0]], y=[after_pixel[1]],
-                   marker=dict(color='green', size=5), name='after optimization'))
-    fig.update_layout(title=dict(text=f"{side}"))
-    fig.write_html(f'{OUTPUT_DIR}compare_pixel_projections_{side}.html')
-
-
-
-def show_pixels_before_and_after_optimize(frame_id, measurement_pixel, before_pixel, after_pixel):
-    img_left, img_right = utils.read_images(frame_id)
-    _show_pixels_over_image(img_left, measurement_pixel[[0,2]], before_pixel[[0,2]], after_pixel[[0,2]], 'Left')
-    _show_pixels_over_image(img_right, measurement_pixel[[1,2]], before_pixel[[1,2]], after_pixel[[1,2]], 'Right')
-
-# def show_pixels_before_and_after_optimize(frame_id, track_id, measurement_pixel, before_pixel, after_pixel):
-#     fig, grid = plt.subplots(1, 2)
-#     fig.set_figwidth(25)
-#     fig.set_figheight(4)
-#     fig.suptitle(f"Track {track_id}, in frame {frame_id}", size='xx-large')
-#     # fig.update_layout(font=dict(size=18))
-#     grid[0].set_title("Left")
-#     grid[1].set_title("Right")
-#     img_left, img_right = utils.read_images(frame_id)
-#     grid[0].axes.xaxis.set_visible(False)
-#     grid[1].axes.xaxis.set_visible(False)
-#     grid[0].axes.yaxis.set_visible(False)
-#     grid[1].axes.yaxis.set_visible(False)
-#     grid[0].imshow(img_left, cmap="gray", aspect='auto')
-#     grid[1].imshow(img_right, cmap="gray", aspect='auto')
-#     _add_pixels(grid, measurement_pixel, "r", "measurement")
-#     _add_pixels(grid, before_pixel, "b", "before_optimize")
-#     _add_pixels(grid, after_pixel, "g", "after_optimize")
-#     fig.savefig(f'{OUTPUT_DIR}compare_pixel_projections.png')
-#     # todo - check how to output it better
-
-
-def reprojection_error_gtsam(db):
+def reprojection_and_factor_error(db):
     track = db.get_random_track_in_len(10)
     frames_cameras, real_pts_2d = create_frames_cameras_and_pixels_from_track(db, track)
 
     track_len = track.get_track_len()
     last_frame_camera = frames_cameras[-1]
-    # last_frame_id, last_kp_idx = track.get_last_frame_id_and_kp_idx()
-    # last_frame_pt_2d = utils.get_stereo_point2(db, last_frame_id, last_kp_idx)
     last_frame_pt_2d = real_pts_2d[-1]
-    # triangulation - 3d_pt in coordinates of first frame in track
     pt_3d = last_frame_camera.backproject(last_frame_pt_2d)
     reprojection_error_left = np.empty(track_len)
     reprojection_error_right = np.empty(track_len)
@@ -122,6 +68,14 @@ def reprojection_error_gtsam(db):
     factor_err_as_func_reproj_err(track.get_id(), factor_error, reprojection_error)
 
 
+def factor_err_as_func_reproj_err(track_id, factor_err, reproj_err):
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=reproj_err, y=factor_err, mode='lines+markers'))
+    fig.update_layout(title=f"Factor err as a function of the reprojection error over track {track_id} images",
+                      xaxis_title='Reprojection err', yaxis_title='Factor err')
+    fig.write_image(f"{OUTPUT_DIR}factor_err_of_reproj_err.png")
+
+
 def create_frames_cameras_and_pixels_from_track(db, track):
     frames_cameras = []
     real_pts_2d = []
@@ -145,22 +99,7 @@ def create_frames_cameras_and_pixels_from_track(db, track):
     return frames_cameras, real_pts_2d
 
 
-def factor_err_as_func_reproj_err(track_id, factor_err, reproj_err):
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=reproj_err, y=factor_err, mode='lines+markers'))
-    fig.update_layout(title=f"Factor err as a function of the reprojection error over track {track_id} images",
-                      xaxis_title='Reprojection err', yaxis_title='Factor err')
-    fig.write_image(f"{OUTPUT_DIR}factor_err_of_reproj_err.png")
-
-
-def run_ex5():
-    db = DataBase()
-    db.read_database(utils.DB_PATH)
-
-    # 5.1
-    reprojection_error_gtsam(db)
-
-    # 5.2
+def q5_2(db):
     bundle_window = BundleWindow(db, 0, 10)
     factor_key = bundle_window.get_random_factor()
     frame_id, track_id = factor_key
@@ -174,54 +113,122 @@ def run_ex5():
     print(f"factor error after optimize: {factor_error_after}")
     measurement, before, after = bundle_window.get_pixels_before_and_after_optimize(frame_id, track_id)
     show_pixels_before_and_after_optimize(frame_id, measurement, before, after)
-
     bundle_window.plot_3d_positions_graph(f'{OUTPUT_DIR}resulting_3d_positions.png')
     bundle_window.plot_2d_positions_graph(f'{OUTPUT_DIR}resulting_2d_positions.png')
 
-    # 5.3
-    ground_truth_matrices = utils.read_matrices("/cs/usr/nava.goetschel/SLAM/VAN_ex/dataset/poses/05.txt")
+
+def q5_3(db):
+    ground_truth_matrices = utils.read_ground_truth_matrices()
     ground_truth_locations = utils.calculate_ground_truth_locations_from_matrices(ground_truth_matrices)
-    alg = BundleAdjustment(2560, 10, db)
+    # mean_track_len, max_track_len, min_track_len = db.get_mean_max_and_min_track_len()
+    # median_track_len = db.get_median_track_len()
+    alg = BundleAdjustment(2560, WINDOW_LEN, db)
     alg.optimize_all_windows()
-
     last_window = alg.get_last_window()
-    print("Final position of first frame of last window: ", last_window.get_frame_location(last_window.get_first_keyframe_id()))
+    print("Final position of first frame of last window: ",
+          last_window.get_frame_location(last_window.get_first_keyframe_id()))
     print("Prior factor error of last window: ", last_window.get_prior_factor_error())
-
     global_poses = alg.get_global_keyframes_poses()
     global_locations = BundleAdjustment.from_poses_to_locations(global_poses)
     global_3d_points = alg.get_global_3d_points(global_poses)
+    initial_estimate = db.get_camera_locations()
+    show_localization_after_optimization(global_3d_points, global_locations, ground_truth_locations, initial_estimate)
+    keyframes_localization_error(alg, global_locations, ground_truth_locations, initial_estimate)
 
-    fig, ax = plt.subplots()
+
+def _show_pixels_over_image(img, measurement_pixel, before_pixel, after_pixel, side):
+    fig = px.imshow(img, color_continuous_scale='gray')
+    fig.update_traces(dict(showscale=False, coloraxis=None, colorscale='gray'))
+    fig.add_trace(
+        go.Scatter(x=[measurement_pixel[0]], y=[measurement_pixel[1]],
+                   marker=dict(color='red', size=5), name='measurement'))
+    fig.add_trace(
+        go.Scatter(x=[before_pixel[0]], y=[before_pixel[1]],
+                   marker=dict(color='blue', size=5), name='before optimization'))
+    fig.add_trace(
+        go.Scatter(x=[after_pixel[0]], y=[after_pixel[1]],
+                   marker=dict(color='green', size=5), name='after optimization'))
+    fig.update_layout(title=dict(text=f"{side}"))
+    fig.write_html(f'{OUTPUT_DIR}compare_pixel_projections_{side}.html')
+
+
+def show_pixels_before_and_after_optimize(frame_id, measurement_pixel, before_pixel, after_pixel):
+    img_left, img_right = utils.read_images(frame_id)
+    _show_pixels_over_image(img_left, measurement_pixel[[0, 2]], before_pixel[[0, 2]], after_pixel[[0, 2]], 'Left')
+    _show_pixels_over_image(img_right, measurement_pixel[[1, 2]], before_pixel[[1, 2]], after_pixel[[1, 2]], 'Right')
+
+
+def keyframes_localization_error(alg, global_locations, ground_truth_locations, initial_estimate):
+    keyframes = alg.get_keyframes()
+    keyframe_localization_error = np.sum((ground_truth_locations[keyframes] - global_locations) ** 2, axis=-1) ** 0.5
+    initial_estimate_error = np.sum((ground_truth_locations[keyframes] - initial_estimate[keyframes]) ** 2,
+                                    axis=-1) ** 0.5
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(x=keyframes, y=keyframe_localization_error, mode='lines+markers', name='after optimization error'))
+    fig.add_trace(
+        go.Scatter(x=keyframes, y=initial_estimate_error, mode='lines+markers', name='initial estimate error'))
+    fig.update_layout(title="Keyframe localization error over time",
+                      xaxis_title='Keyframe id', yaxis_title='localization error')
+    fig.write_image(f"{OUTPUT_DIR}localization error over time.png")
+
+
+def show_localization_after_optimization(global_3d_points, global_locations, ground_truth_locations, initial_estimate):
+    # fig = go.Figure()
+    # fig.add_trace(
+    #     go.Scatter(x=global_locations[:, 0], y=global_locations[:, 2],
+    #                mode='lines+markers', name='Keyframes positions'))
+    # fig.add_trace(
+    #     go.Scatter(x=global_3d_points[:, 0], y=global_3d_points[:, 2],
+    #                mode='markers', name='Points', marker=dict(size=3)))
+    # fig.add_trace(
+    #     go.Scatter(x=ground_truth_locations[:, 0], y=ground_truth_locations[:, 2],
+    #                mode='lines+markers', name='Ground Truth Locations'))
+    # fig.add_trace(
+    #     go.Scatter(x=initial_estimate[:, 0], y=initial_estimate[:, 2],
+    #                mode='lines+markers', name='Initial estimate'))
+    #
+    # fig.update_layout(title='Cameras & Points - View from above',
+    #                   xaxis_title='x', yaxis_title='z')
+    # fig.write_image(f'{OUTPUT_DIR}Key frames after optimization.png')
+
+    fig, ax = plt.subplots(figsize=(12.8, 9.6))
     ax.scatter(x=global_locations[:, 0], y=global_locations[:, 2],
-               c='tab:blue', label='Keyframes positions', s=3, alpha=1)
+               c='tab:blue', label='Keyframes positions', s=3, alpha=1, linestyle='-', marker='o')
+
     ax.scatter(x=global_3d_points[:, 0], y=global_3d_points[:, 2],
                c='tab:orange', label='Points', s=0.1, alpha=0.1)
     ax.scatter(x=ground_truth_locations[:, 0], y=ground_truth_locations[:, 2],
                c='tab:green', label='Ground Truth Locations', s=0.5, alpha=0.7)
-    # ax.set_ylim(0, 200)
+    ax.scatter(x=initial_estimate[:, 0], y=initial_estimate[:, 2],
+               c='tab:purple', label='Initial estimate', s=0.5, alpha=0.7)
+
+
     ax.set_ylim(-200, 200)
     ax.set_xlim(-300, 300)
     ax.legend()
+
+
     plt.title('Cameras & Points - View from above')
     plt.xlabel('x')
     plt.ylabel('z')
     plt.savefig(f'{OUTPUT_DIR}Key frames after optimization.png')
 
 
-    keyframes = alg.get_keyframes()
-    keyframe_localization_error = np.sum((ground_truth_locations[keyframes] - global_locations)**2, axis=-1)**0.5
+def run_ex5():
+    db = DataBase()
+    db.read_database(utils.DB_PATH)
 
-    fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(x=keyframes, y=keyframe_localization_error, mode='lines+markers'))
-    fig.update_layout(title="Keyframe localization error over time",
-                      xaxis_title='Keyframe id', yaxis_title='localization error')
-    fig.write_image(f"{OUTPUT_DIR}localization error over time.png")
+    # 5.1
+    reprojection_and_factor_error(db)
+
+    # 5.2
+    q5_2(db)
+
+    # 5.3
+    q5_3(db)
 
     return 0
-
-
 
 
 run_ex5()

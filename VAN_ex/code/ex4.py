@@ -120,7 +120,7 @@ def tracks_length_histogram(db):
 
 def reprojection_error(db):
     track = db.get_random_track_in_len(10)
-    ground_truth_matrices = utils.read_matrices("C:\\Users\\Miryam\\SLAM\\VAN_ex\\dataset\\poses\\05.txt")
+    ground_truth_matrices = utils.read_ground_truth_matrices("C:\\Users\\Miryam\\SLAM\\VAN_ex\\dataset\\poses\\05.txt")
     last_frame_id, kp_idx = track.get_last_frame_id_and_kp_idx()
     pt_3d = db.get_frame_obj(last_frame_id).get_3d_point(kp_idx)  # in coordinates of last frame
     mat = ground_truth_matrices[last_frame_id]
@@ -195,7 +195,7 @@ def ex4_run():
 
     # use the database for localization (as we did in the previous exercise)
     locations = db.get_camera_locations()
-    ground_truth_matrices = utils.read_matrices("C:\\Users\\Miryam\\SLAM\\VAN_ex\\dataset\\poses\\05.txt")
+    ground_truth_matrices = utils.read_ground_truth_matrices("C:\\Users\\Miryam\\SLAM\\VAN_ex\\dataset\\poses\\05.txt")
     ground_truth_locations = utils.calculate_ground_truth_locations_from_matrices(ground_truth_matrices)
     utils.show_localization(locations, ground_truth_locations, f'{OUTPUT_DIR}localization.png')
 
