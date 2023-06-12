@@ -196,3 +196,8 @@ class BundleWindow:
         plt.ylabel('z')
         plt.savefig(output_path)
 
+    def get_marginals(self):
+        return gtsam.Marginals(self._graph, self._current_values)
+
+    def get_current_values(self):
+        return self._current_values

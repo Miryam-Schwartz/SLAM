@@ -61,4 +61,5 @@ class BundleAdjustment:
         max_frame_key = max(self._bundle_windows.keys())
         return self._bundle_windows[max_frame_key]
 
-
+    def get_first_window(self):
+        return self._bundle_windows[0]
