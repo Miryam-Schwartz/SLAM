@@ -51,7 +51,18 @@ class BundleWindow:
             frame_obj = self._db.get_frame_obj(frame_id)
             frame_tracks = set(frame_obj.get_tracks_dict().keys())
             tracks = tracks.union(frame_tracks)
-        return tracks
+        tracks_to_delete = set()
+        for track_id in tracks:
+            counter = 0
+            track_obj = self._db.get_track_obj(track_id)
+            frames_dict_of_track = track_obj.get_frames_dict()
+            for frame_id in frames_dict_of_track.keys():
+                if self._last_keyframe_id >= frame_id >= self._first_keyframe_id:
+                    counter += 1
+            if counter <= 1:
+                tracks_to_delete.add(track_id)
+        print(f"track len: {len(tracks)}, tracks to delete: {len(tracks_to_delete)}")
+        return tracks-tracks_to_delete
 
     def _init_initial_estimate(self):
         values = gtsam.Values()
@@ -78,6 +89,7 @@ class BundleWindow:
         factors = dict()
         cov = gtsam.noiseModel.Isotropic.Sigma(3, 1.0)
 
+        print(f'len of tracks of window: {self._first_keyframe_id} - {self._last_keyframe_id}: {len(self._tracks)}')
         for track_id in self._tracks:
             track_obj = self._db.get_track_obj(track_id)
             frames_dict = track_obj.get_frames_dict()
@@ -197,7 +209,27 @@ class BundleWindow:
         plt.savefig(output_path)
 
     def get_marginals(self):
+        print("get marginals of window: ", self._first_keyframe_id, ", ", self._last_keyframe_id)
+        if(self._first_keyframe_id == 418):
+            tuple_keys = self._factors.keys()
+            for cam, p in tuple_keys:
+                if p== 77245:
+                    print("there is a factor!!!!")
         return gtsam.Marginals(self._graph, self._current_values)
 
     def get_current_values(self):
         return self._current_values
+
+    def get_covariance(self):
+        # the returned covariance is of first anf last frames in window
+        # covariance of last frame in condition of first frame
+        keys = gtsam.KeyVector()
+        keys.append(gtsam.symbol(CAMERA_SYMBOL, self._first_keyframe_id))
+        keys.append(gtsam.symbol(CAMERA_SYMBOL, self._last_keyframe_id))
+        marginals = self.get_marginals()
+        if self._first_keyframe_id == 19:
+            print(self._factors)
+        sliced_inform_mat = marginals.jointMarginalInformation(keys).at(keys[-1], keys[-1])
+        # inform_mat = np.linalg.inv(cov_mat)
+        # inform_mat = inform_mat[6:, 6:]
+        return np.linalg.inv(sliced_inform_mat)

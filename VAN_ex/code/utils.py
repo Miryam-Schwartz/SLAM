@@ -3,6 +3,7 @@ import gtsam
 import numpy as np
 # from matplotlib import pyplot as plt
 # import plotly.graph_objs as go
+from matplotlib import pyplot as plt
 
 DATA_PATH = r'/cs/usr/nava.goetschel/SLAM/VAN_ex/dataset/sequences/05/'
 DB_PATH = r'/cs/usr/nava.goetschel/SLAM/VAN_ex/code/DB/'

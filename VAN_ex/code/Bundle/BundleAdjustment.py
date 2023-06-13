@@ -46,6 +46,14 @@ class BundleAdjustment:
             poses[last_keyframe] = global_pose_last_keyframe
         return poses
 
+    def get_relative_motion_and_covariance(self):
+        motions, covs = dict(), dict()  # key = (first_keyframe, last_keyframe), val = relative motion / relative cov mat
+        for first_keyframe, window in self._bundle_windows.items():
+            last_key_frame = window.get_last_keyframe_id()
+            motions[(first_keyframe, last_key_frame)] = window.get_frame_pose3(last_key_frame)
+            covs[(first_keyframe, last_key_frame)] = window.get_covariance()
+        return motions, covs
+
     def get_global_3d_points(self, global_poses):
         # assume gloal_poses is dict: key = frame_id, val = pose of frame in global coordinates
         points_list = []
