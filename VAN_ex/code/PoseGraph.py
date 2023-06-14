@@ -1,4 +1,5 @@
 import gtsam
+import numpy as np
 
 from VAN_ex.code.Bundle.BundleWindow import CAMERA_SYMBOL
 
@@ -9,8 +10,10 @@ class PoseGraph:
         self._initial_estimate = self._init_initial_estimate()
         self._current_values = self._initial_estimate
         self._factors = self._init_factors()
+        sigmas = np.array([(1 * np.pi / 180) ** 2] * 3 + [1e-1, 1, 1e-1])
+        cov = gtsam.noiseModel.Diagonal.Sigmas(sigmas=sigmas)
         self._prior_factor =\
-            gtsam.PriorFactorPose3(gtsam.symbol(CAMERA_SYMBOL, 0), gtsam.Pose3(), gtsam.noiseModel.Unit.Create(6))
+            gtsam.PriorFactorPose3(gtsam.symbol(CAMERA_SYMBOL, 0), gtsam.Pose3(), cov)
         self._graph = self._init_graph()
         self._optimizer = gtsam.LevenbergMarquardtOptimizer(self._graph, self._initial_estimate)
 

@@ -20,7 +20,7 @@ def show_feature_track(track, db):
     :param db: database
     :param num_frames: track length at least to choose
     """
-    fig, grid = plt.subplots(track.get_track_len(), 2)
+    fig, grid = plt.subplots(10, 2)
     fig.set_figwidth(4)
     fig.set_figheight(12)
     fig.suptitle(f"Track {track.get_id()}, with length of {track.get_track_len()} frames")
@@ -44,13 +44,15 @@ def show_feature_track(track, db):
         grid[i, 1].scatter(x_right, y_right, s=10, c="r")
         grid[i, 1].set_yticklabels([])
         i = i + 1
+        if i == 10:
+            break
     fig.savefig(f'{OUTPUT_DIR}track.png')
 
 def ex6_run():
     db = DataBase()
     db.read_database(utils.DB_PATH)
 
-    # track = db.get_track_obj(350160)
+    # track = db.get_track_obj(2138)
     # print(track.get_frames_dict())
     # show_feature_track(track, db)
 
@@ -59,25 +61,25 @@ def ex6_run():
     bundle_adjustment.optimize_all_windows()
 
 
-    # first_window = bundle_adjustment.get_first_window()
-    # marginals = first_window.get_marginals()
-    # # print(marginals)
-    # result = first_window.get_current_values()
-    # plot.plot_trajectory(0, result, marginals=marginals, scale=1, title="Covariance poses for first bundle",
-    #                      save_file=f"{OUTPUT_DIR}Poses rel_covs.png"
-    #                      # , d2_view=False
-    #                      ) #todo: fix graph
-    #
-    # first_camera = first_window.get_frame_pose3(first_window.get_first_keyframe_id())
-    # second_camera = first_window.get_frame_pose3(first_window.get_last_keyframe_id())
-    # relative_pose = first_camera.between(second_camera)
-    #
-    # print("Relative pose between first two keyframes:")
-    # print(first_window.get_frame_pose3(first_window.get_last_keyframe_id()))
-    # print("relative pose - with between method")
-    # print(relative_pose)
-    # print("Covariance:")
-    # print(first_window.get_covariance())
+    first_window = bundle_adjustment.get_first_window()
+    marginals = first_window.get_marginals()
+    # print(marginals)
+    result = first_window.get_current_values()
+    plot.plot_trajectory(0, result, marginals=marginals, scale=1, title="Covariance poses for first bundle",
+                         save_file=f"{OUTPUT_DIR}Poses rel_covs.png"
+                         # , d2_view=False
+                         ) #todo: fix graph
+
+    first_camera = first_window.get_frame_pose3(first_window.get_first_keyframe_id())
+    second_camera = first_window.get_frame_pose3(first_window.get_last_keyframe_id())
+    relative_pose = first_camera.between(second_camera)
+
+    print("Relative pose between first two keyframes:")
+    print(first_window.get_frame_pose3(first_window.get_last_keyframe_id()))
+    print("relative pose - with between method")
+    print(relative_pose)
+    print("Covariance:")
+    print(first_window.get_covariance())
 
     # 6.2
     # track = db.get_track_obj(350160)

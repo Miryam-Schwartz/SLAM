@@ -28,7 +28,9 @@ class BundleWindow:
         self._initial_estimate = self._init_initial_estimate()
         self._current_values = self._initial_estimate  # before optimization - current values is initial estimate
         self._factors = self._init_factors()
-        self._prior_factor = gtsam.PriorFactorPose3(gtsam.symbol(CAMERA_SYMBOL, first_keyframe_id), gtsam.Pose3(), gtsam.noiseModel.Unit.Create(6))
+        sigmas = np.array([(1 * np.pi / 180) ** 2] * 3 + [0.03, 0.003, 0.03])
+        cov = gtsam.noiseModel.Diagonal.Sigmas(sigmas=sigmas)
+        self._prior_factor = gtsam.PriorFactorPose3(gtsam.symbol(CAMERA_SYMBOL, first_keyframe_id), gtsam.Pose3(), cov)
         self._graph = self._init_graph()
         self._optimizer = gtsam.LevenbergMarquardtOptimizer(self._graph, self._initial_estimate)
 
@@ -87,7 +89,7 @@ class BundleWindow:
 
     def _init_factors(self):
         factors = dict()
-        cov = gtsam.noiseModel.Isotropic.Sigma(3, 1.0)
+        cov = gtsam.noiseModel.Isotropic.Sigma(3, 0.5)
 
         # print(f'len of tracks of window: {self._first_keyframe_id} - {self._last_keyframe_id}: {len(self._tracks)}')
         for track_id in self._tracks:
