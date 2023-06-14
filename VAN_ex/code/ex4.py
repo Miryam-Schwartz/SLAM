@@ -201,5 +201,5 @@ def ex4_run():
 
     return 0
 
-
-ex4_run()
+if __name__ == '__main__':
+    ex4_run()

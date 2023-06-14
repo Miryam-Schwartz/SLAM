@@ -239,14 +239,15 @@ def calculate_ground_truth_locations_from_matrices(ground_truth_matrices):
     return locations
 
 
-def show_localization(estimated_locations, ground_truth_locations, output_path):
+def show_localization(estimated_locations, ground_truth_locations, output_path, title='Estimated vs Real localization'):
     fig, ax = plt.subplots()
-    ax.scatter(x=ground_truth_locations[:, 0], y=ground_truth_locations[:, 2],
-               c='tab:orange', label='Ground truth localization', s=0.3, alpha=0.5)
+    if ground_truth_locations is not None:
+        ax.scatter(x=ground_truth_locations[:, 0], y=ground_truth_locations[:, 2],
+                   c='tab:orange', label='Ground truth localization', s=0.3, alpha=0.5)
     ax.scatter(x=estimated_locations[:, 0], y=estimated_locations[:, 2],
                label='Our_estimated_localization', s=0.5, alpha=0.7)
     ax.legend()
-    plt.title('Estimated vs Real localization')
+    plt.title(title)
     plt.xlabel('x')
     plt.ylabel('z')
     plt.savefig(output_path)

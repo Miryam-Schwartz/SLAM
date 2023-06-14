@@ -52,3 +52,15 @@ class PoseGraph:
             global_pose_last_keyframe = self._current_values.atPose3(gtsam.symbol(CAMERA_SYMBOL, second_keyframe_id))
             poses[second_keyframe_id] = global_pose_last_keyframe
         return poses
+
+    def total_factor_error(self):  # returns error of current values
+        error = 0
+        for factor in self._factors.values():
+            error += factor.error(self._current_values)
+        return error
+
+    def get_marginals(self):
+        return gtsam.Marginals(self._graph, self._current_values)
+
+    def get_current_values(self):
+        return self._current_values

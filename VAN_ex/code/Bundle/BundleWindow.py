@@ -61,7 +61,7 @@ class BundleWindow:
                     counter += 1
             if counter <= 1:
                 tracks_to_delete.add(track_id)
-        print(f"track len: {len(tracks)}, tracks to delete: {len(tracks_to_delete)}")
+        # print(f"track len: {len(tracks)}, tracks to delete: {len(tracks_to_delete)}")
         return tracks-tracks_to_delete
 
     def _init_initial_estimate(self):
@@ -89,7 +89,7 @@ class BundleWindow:
         factors = dict()
         cov = gtsam.noiseModel.Isotropic.Sigma(3, 1.0)
 
-        print(f'len of tracks of window: {self._first_keyframe_id} - {self._last_keyframe_id}: {len(self._tracks)}')
+        # print(f'len of tracks of window: {self._first_keyframe_id} - {self._last_keyframe_id}: {len(self._tracks)}')
         for track_id in self._tracks:
             track_obj = self._db.get_track_obj(track_id)
             frames_dict = track_obj.get_frames_dict()
@@ -123,7 +123,7 @@ class BundleWindow:
             pt_2d = utils.get_stereo_point2(self._db, last_frame_id, last_kp_idx)
             pt_3d = last_frame_stereo_cam.backproject(pt_2d)
 
-            if pt_3d[2] <= 0 or pt_3d[2] >= 300:
+            if pt_3d[2] <= 0 or pt_3d[2] >= 200:
                 continue
             else:
                 values.insert(gtsam.symbol(POINT_SYMBOL, track_id), pt_3d)
@@ -210,11 +210,11 @@ class BundleWindow:
 
     def get_marginals(self):
         print("get marginals of window: ", self._first_keyframe_id, ", ", self._last_keyframe_id)
-        if(self._first_keyframe_id == 418):
-            tuple_keys = self._factors.keys()
-            for cam, p in tuple_keys:
-                if p== 77245:
-                    print("there is a factor!!!!")
+        # if(self._first_keyframe_id == 418):
+        #     tuple_keys = self._factors.keys()
+        #     for cam, p in tuple_keys:
+        #         if p== 77245:
+        #             print("there is a factor!!!!")
         return gtsam.Marginals(self._graph, self._current_values)
 
     def get_current_values(self):
@@ -227,8 +227,8 @@ class BundleWindow:
         keys.append(gtsam.symbol(CAMERA_SYMBOL, self._first_keyframe_id))
         keys.append(gtsam.symbol(CAMERA_SYMBOL, self._last_keyframe_id))
         marginals = self.get_marginals()
-        if self._first_keyframe_id == 19:
-            print(self._factors)
+        # if self._first_keyframe_id == 19:
+        #     print(self._factors)
         sliced_inform_mat = marginals.jointMarginalInformation(keys).at(keys[-1], keys[-1])
         # inform_mat = np.linalg.inv(cov_mat)
         # inform_mat = inform_mat[6:, 6:]
