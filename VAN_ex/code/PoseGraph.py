@@ -1,5 +1,6 @@
 import gtsam
 import numpy as np
+from gtsam.utils import plot
 
 from VAN_ex.code.Bundle.BundleWindow import CAMERA_SYMBOL
 
@@ -72,7 +73,7 @@ class PoseGraph:
         # find the shortest path and sum the covariance
         pass
 
-    def get_keyframes_list(self):
+    def get_keyframes(self):
         keyframes_lst = set()
         for keyframes_tuple in self._factors.keys():
             set.add(keyframes_tuple[0])
@@ -86,3 +87,10 @@ class PoseGraph:
              pose_i_to_n, noise_model)
         self._factors[(i_keyframe, n_keyframe)] = factor
         self._graph.add(factor)
+
+    def show(self, output_path):
+        marginals = self.get_marginals()
+        result = self.get_current_values()
+        plot.plot_trajectory(0, result, marginals=marginals, scale=1, title="Locations with marginal covariance",
+                             save_file=output_path, d2_view=True)
+

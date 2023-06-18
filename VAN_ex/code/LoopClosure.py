@@ -4,6 +4,7 @@ import numpy as np
 from VAN_ex.code import utils
 from VAN_ex.code.Bundle.BundleWindow import CAMERA_SYMBOL, POINT_SYMBOL
 from Bundle.BundleWindow import BundleWindow
+from VAN_ex.code.ex7 import OUTPUT_DIR
 
 
 def setdiff_nd_positivenums(a, b):
@@ -39,8 +40,9 @@ class LoopClosure:
     def find_loops(self):
         counter = 0
         loops_dict = dict()
-        keyframes_list = self._pose_graph.get_keyframes_list()
-        for n_keyframe in keyframes_list:
+        keyframes_list = self._pose_graph.get_keyframes()
+        interval_len = int(len(keyframes_list) / 6)
+        for j, n_keyframe in enumerate(keyframes_list):
             prev_keyframes = [kf for kf in keyframes_list if kf < n_keyframe]
             candidates = self.detect_possible_candidates(n_keyframe, prev_keyframes)
             for i_keyframe in candidates:
@@ -54,6 +56,9 @@ class LoopClosure:
                                                    inliers_matches)
                     # 7.4
                     self._pose_graph.add_loop_factor(i_keyframe, n_keyframe, pose_i_to_n, cov_i_to_n)
+            self._pose_graph.optimize()
+            if j % interval_len == 0:
+                self._pose_graph.show(f"{OUTPUT_DIR}pose_graph_after_iteration_j.png")
         return loops_dict
 
 
@@ -98,3 +103,5 @@ class LoopClosure:
         sliced_inform_mat = marginals.jointMarginalInformation(keys).at(keys[-1], keys[-1])
         cov_i_to_n = np.linalg.inv(sliced_inform_mat)
         return optimized_pose_i_to_n, cov_i_to_n
+
+
