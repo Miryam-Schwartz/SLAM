@@ -212,11 +212,6 @@ class BundleWindow:
 
     def get_marginals(self):
         print("get marginals of window: ", self._first_keyframe_id, ", ", self._last_keyframe_id)
-        # if(self._first_keyframe_id == 418):
-        #     tuple_keys = self._factors.keys()
-        #     for cam, p in tuple_keys:
-        #         if p== 77245:
-        #             print("there is a factor!!!!")
         return gtsam.Marginals(self._graph, self._current_values)
 
     def get_current_values(self):
@@ -229,9 +224,5 @@ class BundleWindow:
         keys.append(gtsam.symbol(CAMERA_SYMBOL, self._first_keyframe_id))
         keys.append(gtsam.symbol(CAMERA_SYMBOL, self._last_keyframe_id))
         marginals = self.get_marginals()
-        # if self._first_keyframe_id == 19:
-        #     print(self._factors)
         sliced_inform_mat = marginals.jointMarginalInformation(keys).at(keys[-1], keys[-1])
-        # inform_mat = np.linalg.inv(cov_mat)
-        # inform_mat = inform_mat[6:, 6:]
         return np.linalg.inv(sliced_inform_mat)

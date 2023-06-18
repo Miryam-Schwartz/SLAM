@@ -67,3 +67,22 @@ class PoseGraph:
 
     def get_current_values(self):
         return self._current_values
+
+    def get_relative_covariance(self, i_keyframe, n_keyframe):
+        # find the shortest path and sum the covariance
+        pass
+
+    def get_keyframes_list(self):
+        keyframes_lst = set()
+        for keyframes_tuple in self._factors.keys():
+            set.add(keyframes_tuple[0])
+            set.add(keyframes_tuple[1])
+        return list(keyframes_lst)
+
+    def add_loop_factor(self, i_keyframe, n_keyframe, pose_i_to_n, cov):
+        noise_model = gtsam.noiseModel.Gaussian.Covariance(cov)
+        factor = gtsam.BetweenFactorPose3 \
+            (gtsam.symbol(CAMERA_SYMBOL, i_keyframe), gtsam.symbol(CAMERA_SYMBOL, n_keyframe),
+             pose_i_to_n, noise_model)
+        self._factors[(i_keyframe, n_keyframe)] = factor
+        self._graph.add(factor)
