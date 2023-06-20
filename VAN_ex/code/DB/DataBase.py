@@ -330,13 +330,18 @@ class DataBase:
 
     def _save_match_in_frame(self, path):
         header = ['frame_id', 'idx_kp', 'x_left', 'y_left', 'x_right', 'y_right']
+        des_hedear = [str(i) for i in range(128)]
+        header.extend(des_hedear)
         with open(path, 'w', encoding='UTF8', newline='') as f:
             writer = csv.writer(f)
             writer.writerow(header)
             for frame_id, frame in self._frames_dict.items():
+                left_des = frame.get_des_left()
                 for i in range(frame.get_kp_len()):
                     pixel_left, pixel_right = frame.get_feature_pixels(i)
+                    left_des_i = left_des[i:].tolist()
                     row = [frame_id, i, pixel_left[0], pixel_left[1], pixel_right[0], pixel_right[1]]
+                    row.extend(left_des_i)
                     writer.writerow(row)
 
     def _save_match_between_frames(self, path):
@@ -393,10 +398,11 @@ class DataBase:
             for row in csvreader:
                 frame_id, idx_kp, x_l, y_l, x_r, y_r = \
                     int(row[0]), int(row[1]), float(row[2]), float(row[3]), float(row[4]), float(row[5])
+                des = [float(row[i]) for i in range(6, 134)]
                 if frame_id not in self._frames_dict:
-                    self._frames_dict[frame_id] = Frame(frame_id, [(x_l, y_l)], [(x_r, y_r)], [])
+                    self._frames_dict[frame_id] = Frame(frame_id, [(x_l, y_l)], [(x_r, y_r)], des)
                 else:
-                    self._frames_dict[frame_id].add_kp(idx_kp, (x_l, y_l), (x_r, y_r))
+                    self._frames_dict[frame_id].add_kp(idx_kp, (x_l, y_l), (x_r, y_r), des)
         # after creating frames objects, add the tracks object to their dict
         for track_id, track in self._tracks_dict.items():
             for frame_id in track.get_frames_dict():

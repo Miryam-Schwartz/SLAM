@@ -22,30 +22,7 @@ def create_intrinsic_mat():
     return K
 
 
-<<<<<<< Updated upstream
 def reprojection_and_factor_error(db):
-=======
-def show_pixels_before_and_after_optimize(frame_id, track_id, measurement_pixel, before_pixel, after_pixel):
-    fig, grid = plt.subplots(1, 2)
-    fig.set_figwidth(20)
-    fig.set_figheight(10)
-    fig.suptitle(f"Track {track_id}, in frame {frame_id}")
-    grid[0].set_title("Left")
-    grid[1].set_title("Right")
-    img_left, img_right = utils.read_images(frame_id)
-    grid[0].axes.xaxis.set_visible(False)
-    grid[1].axes.xaxis.set_visible(False)
-    grid[0].axes.yaxis.set_visible(False)
-    grid[1].axes.yaxis.set_visible(False)
-    grid[0].imshow(img_left, cmap="gray", aspect='auto')
-    grid[1].imshow(img_right, cmap="gray", aspect='auto')
-    _add_pixels(grid, measurement_pixel, "r", "measurement")
-    _add_pixels(grid, before_pixel, "b", "before_optimize")
-    _add_pixels(grid, after_pixel, "g", "after_optimize")
-    fig.savefig(f'{OUTPUT_DIR}compare_pixel_projections.png')
-
-def reprojection_error_gtsam(db):
->>>>>>> Stashed changes
     track = db.get_random_track_in_len(10)
     frames_cameras, real_pts_2d = create_frames_cameras_and_pixels_from_track(db, track)
 

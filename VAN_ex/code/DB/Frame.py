@@ -1,3 +1,5 @@
+import numpy as np
+
 from VAN_ex.code import utils
 
 
@@ -126,7 +128,7 @@ class Frame:
         assert (new_track.get_id() not in self._tracks_dict)
         self._tracks_dict[new_track.get_id()] = new_track
 
-    def add_kp(self, idx_kp, pixel_left, pixel_right):
+    def add_kp(self, idx_kp, pixel_left, pixel_right, des):
         """
         Add keypoint to the frame lists (both left and right keypoints lists)
         :param idx_kp: index of keypoint to add
@@ -136,4 +138,5 @@ class Frame:
         assert (idx_kp == len(self._kp_left))
         self._kp_left.append(pixel_left)
         self._kp_right.append(pixel_right)
+        self._des_left = np.concatenate((self._des_left, np.array(des)), axis=0)
 
