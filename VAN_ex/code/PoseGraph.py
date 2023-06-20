@@ -1,5 +1,7 @@
 import gtsam
 import numpy as np
+import networkx as nx
+
 from gtsam.utils import plot
 
 from VAN_ex.code.Bundle.BundleWindow import CAMERA_SYMBOL
@@ -13,10 +15,17 @@ class PoseGraph:
         self._factors = self._init_factors()
         sigmas = np.array([(1 * np.pi / 180) ** 2] * 3 + [1e-1, 1, 1e-1])
         cov = gtsam.noiseModel.Diagonal.Sigmas(sigmas=sigmas)
-        self._prior_factor =\
+        self._prior_factor = \
             gtsam.PriorFactorPose3(gtsam.symbol(CAMERA_SYMBOL, 0), gtsam.Pose3(), cov)
         self._graph = self._init_graph()
         self._optimizer = gtsam.LevenbergMarquardtOptimizer(self._graph, self._initial_estimate)
+        self._shortest_path_graph = self._init_shortest_path_graph()
+
+    def _init_shortest_path_graph(self):
+        G = nx.DiGraph()
+        G.add_nodes_from(self.get_keyframes())
+        G.ad
+        return G
 
     def _init_initial_estimate(self):
         initial_estimate = gtsam.Values()
@@ -31,7 +40,7 @@ class PoseGraph:
         for keyframes_tuple, motion in relative_motions.items():
             first_keyframe_id, second_keyframe_id = keyframes_tuple
             noise_model = gtsam.noiseModel.Gaussian.Covariance(relative_covs[keyframes_tuple])
-            factor = gtsam.BetweenFactorPose3\
+            factor = gtsam.BetweenFactorPose3 \
                 (gtsam.symbol(CAMERA_SYMBOL, first_keyframe_id), gtsam.symbol(CAMERA_SYMBOL, second_keyframe_id),
                  motion, noise_model)
             factors[keyframes_tuple] = factor
@@ -86,11 +95,11 @@ class PoseGraph:
             (gtsam.symbol(CAMERA_SYMBOL, i_keyframe), gtsam.symbol(CAMERA_SYMBOL, n_keyframe),
              pose_i_to_n, noise_model)
         self._factors[(i_keyframe, n_keyframe)] = factor
+        factor.noiseModel()
         self._graph.add(factor)
 
-    def show(self, output_path):
+    def show(self, output_path, j):
         marginals = self.get_marginals()
         result = self.get_current_values()
-        plot.plot_trajectory(0, result, marginals=marginals, scale=1, title="Locations with marginal covariance",
+        plot.plot_trajectory(0, result, marginals=marginals, scale=1, title=f"Loop closure after iteration {j}",
                              save_file=output_path, d2_view=True)
-
