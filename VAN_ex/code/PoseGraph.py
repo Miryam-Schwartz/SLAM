@@ -18,12 +18,15 @@ class PoseGraph:
         self._current_values = self._initial_estimate
         self._shortest_path_graph = self._init_shortest_path_graph()
         self._factor_covariances = dict()
-        self._factors = self._init_factors()
+        self._graph = gtsam.NonlinearFactorGraph()
+        self._factors = dict()
+        self._init_factors()
         sigmas = np.array([(1 * np.pi / 180) ** 2] * 3 + [1e-1, 1, 1e-1])
         cov = gtsam.noiseModel.Diagonal.Sigmas(sigmas=sigmas)
         self._prior_factor = \
             gtsam.PriorFactorPose3(gtsam.symbol(CAMERA_SYMBOL, 0), gtsam.Pose3(), cov)
-        self._graph = self._init_graph()
+        self._graph.add(self._prior_factor)
+        # self._graph = self._init_graph()
         self._optimizer = gtsam.LevenbergMarquardtOptimizer(self._graph, self._initial_estimate)
 
     def _init_shortest_path_graph(self):
@@ -39,8 +42,8 @@ class PoseGraph:
         return initial_estimate
 
     def _init_factors(self):
+
         relative_motions, relative_covs = self._bundle_adjustment.get_relative_motion_and_covariance()
-        factors = dict()
         for keyframes_tuple, motion in relative_motions.items():
             first_keyframe_id, second_keyframe_id = keyframes_tuple
             self.add_factor(first_keyframe_id, second_keyframe_id, motion, relative_covs[keyframes_tuple])
@@ -51,14 +54,13 @@ class PoseGraph:
             # factors[keyframes_tuple] = factor
             # self._shortest_path_graph.add_edge(first_keyframe_id, second_keyframe_id,
             #                                    weight=cov_weight_square_det(relative_covs[keyframes_tuple]))
-        return factors
 
-    def _init_graph(self):
-        graph = gtsam.NonlinearFactorGraph()
-        for factor in self._factors.values():
-            graph.add(factor)
-        graph.add(self._prior_factor)
-        return graph
+    # def _init_graph(self):
+    #     graph = gtsam.NonlinearFactorGraph()
+    #     for factor in self._factors.values():
+    #         graph.add(factor)
+    #     graph.add(self._prior_factor)
+    #     return graph
 
     def optimize(self):
         self._current_values = self._optimizer.optimize()

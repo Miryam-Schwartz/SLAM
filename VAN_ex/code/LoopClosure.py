@@ -1,15 +1,32 @@
 import gtsam
 import numpy as np
+import RANSAC
 
 from VAN_ex.code import utils
 from VAN_ex.code.Bundle.BundleWindow import CAMERA_SYMBOL, POINT_SYMBOL
 from Bundle.BundleWindow import BundleWindow
-from VAN_ex.code.ex7 import OUTPUT_DIR
 
 
-def subtract_lines(a, b):
-    s = np.maximum(a.max(0) + 1, b.max(0) + 1)
-    return a[~np.isin(a.dot(s), b.dot(s))]
+# def subtract_lines(a, b):
+#     s = np.maximum(a.max(0) + 1, b.max(0) + 1)
+#     return a[~np.isin(a.dot(s), b.dot(s))]
+
+
+def extract_matches(matches, kp_left_first, kp_right_first, kp_left_second, kp_right_second):
+    first_pixels = np.empty(matches.shape[0], 3)
+    second_pixels = np.empty(matches.shape[0], 3)
+    for i, match in enumerate(matches):
+        idx_kp_first = match[0]
+        idx_kp_second = match[1]
+        first_pixels[i] = convert_idx_to_coordinate(idx_kp_first, kp_left_first, kp_right_first)
+        second_pixels[i] = convert_idx_to_coordinate(idx_kp_second, kp_left_second, kp_right_second)
+    return first_pixels, second_pixels
+
+
+def convert_idx_to_coordinate(idx_kp, kp_left, kp_right):
+    x_left_first, y_left_first = kp_left[idx_kp]
+    x_right_first, y_right_first = kp_right[idx_kp]
+    return np.array([x_left_first, x_right_first, np.average(y_left_first, y_right_first)])
 
 
 class LoopClosure:
@@ -38,37 +55,40 @@ class LoopClosure:
 
     def consensus_matching(self, i_keyframe, n_keyframe):
         # 7.2
-        n_des_left = self._db.get_frame_obj(n_keyframe).get_des_left()
-        i_des_left = self._db.get_frame_obj(i_keyframe).get_des_left()
-        matches = utils.find_matches(i_des_left, n_des_left)
-        matches = [(match.queryIdx, match.trainIdx) for match in matches]
-        extrinsic_camera_mat_i_to_n_left, inliers_matches, inliers_percentage = \
-            self._db.RANSAC(i_keyframe, n_keyframe, matches)
-        return inliers_matches, subtract_lines(np.array(matches), inliers_matches), extrinsic_camera_mat_i_to_n_left
+        extrinsic_camera_mat_second_frame_left, inliers_matches, outliers_matches, \
+            kp_left_first, kp_right_first, kp_left_second, kp_right_second = RANSAC.RANSAC(i_keyframe, n_keyframe)
+        inliers_i, inliers_n =\
+            extract_matches(inliers_matches, kp_left_first, kp_right_first, kp_left_second, kp_right_second)
+        outliers_i, outliers_n =\
+            extract_matches(outliers_matches, kp_left_first, kp_right_first, kp_left_second, kp_right_second)
+        return extrinsic_camera_mat_second_frame_left, inliers_i, inliers_n, outliers_i, outliers_n
 
-    def find_loops(self):
+    def find_loops(self, output_dir):
         loops_dict = dict()
         keyframes_list = self._pose_graph.get_keyframes()
         interval_len = int(len(keyframes_list) / 6)
         for j, n_keyframe in enumerate(keyframes_list):
+            print("keyframe ", n_keyframe)
             prev_keyframes = [kf for kf in keyframes_list if kf < n_keyframe]
             candidates = self.detect_possible_candidates(n_keyframe, prev_keyframes)
             for i_keyframe in candidates:
-                inliers_matches, outliers_matches, extrinsic_camera_mat_i_to_n_left = \
+                extrinsic_camera_mat_i_to_n_left, inliers_i, inliers_n, outliers_i, outliers_n = \
                     self.consensus_matching(i_keyframe, n_keyframe)
-                if len(inliers_matches) > self._threshold_inliers_num:
-                    loops_dict[(i_keyframe, n_keyframe)] = (inliers_matches, outliers_matches)
+                if inliers_i.shape[0] > self._threshold_inliers_num:
+                    loops_dict[(i_keyframe, n_keyframe)] = (inliers_i, inliers_n, outliers_i, outliers_n)
                     pose_i_to_n, cov_i_to_n = \
                         self.bundle_for_two_frames(i_keyframe, n_keyframe, extrinsic_camera_mat_i_to_n_left,
-                                                   inliers_matches)
+                                                   inliers_i, inliers_n)
                     # 7.4
                     self._pose_graph.add_factor(i_keyframe, n_keyframe, pose_i_to_n, cov_i_to_n)
+                    print(f"add loop {i_keyframe} to {n_keyframe}")
                     self._pose_graph.optimize()
             if j % interval_len == 0:
-                self._pose_graph.show(f"{OUTPUT_DIR}pose_graph_after_iteration_{j}.png", j)
+                self._pose_graph.show(f"{output_dir}pose_graph_after_iteration_{j}.png", j)
         return loops_dict
 
-    def bundle_for_two_frames(self, i_keyframe, n_keyframe, extrinsic_i_to_n, matches):
+    def bundle_for_two_frames(self, i_keyframe, n_keyframe, extrinsic_i_to_n, inliers_i, inliers_n):
+
         graph = gtsam.NonlinearFactorGraph()
         values = gtsam.Values()
 
@@ -86,23 +106,22 @@ class LoopClosure:
 
         # add factors between each point (from matches) to i and n poses
         n_stereo_cam = gtsam.StereoCamera(n_pos3, BundleWindow.K)
-        for i, match in enumerate(matches):
-            # match[0] is kp idx in frame i, match[1] is kp idx in frame n
-            n_pt_2d = utils.get_stereo_point2(self._db, n_keyframe, match[1])
+        for j in range(inliers_i.shape[0]):
+            n_pt_2d = gtsam.StereoPoint2(inliers_n[j][0], inliers_n[j][1], inliers_n[j][2])
 
             pt_3d = n_stereo_cam.backproject(n_pt_2d)
             if pt_3d[2] <= 0 or pt_3d[2] >= 200:
                 continue
 
-            values.insert(gtsam.symbol(POINT_SYMBOL, i), pt_3d)
+            values.insert(gtsam.symbol(POINT_SYMBOL, j), pt_3d)
             cov = gtsam.noiseModel.Isotropic.Sigma(3, 0.5)
             n_factor = gtsam.GenericStereoFactor3D \
-                (n_pt_2d, cov, gtsam.symbol(CAMERA_SYMBOL, n_keyframe), gtsam.symbol(POINT_SYMBOL, i),
+                (n_pt_2d, cov, gtsam.symbol(CAMERA_SYMBOL, n_keyframe), gtsam.symbol(POINT_SYMBOL, j),
                  BundleWindow.K)
 
-            i_pt_2d = utils.get_stereo_point2(self._db, i_keyframe, match[0])
+            i_pt_2d = gtsam.StereoPoint2(inliers_i[j][0], inliers_i[j][1], inliers_i[j][2])
             i_factor = gtsam.GenericStereoFactor3D \
-                (i_pt_2d, cov, gtsam.symbol(CAMERA_SYMBOL, i_keyframe), gtsam.symbol(POINT_SYMBOL, i),
+                (i_pt_2d, cov, gtsam.symbol(CAMERA_SYMBOL, i_keyframe), gtsam.symbol(POINT_SYMBOL, j),
                  BundleWindow.K)
             graph.add(n_factor)
             graph.add(i_factor)

@@ -5,9 +5,9 @@ import numpy as np
 import plotly.graph_objs as go
 from matplotlib import pyplot as plt
 
-DATA_PATH = r'/cs/usr/nava.goetschel/SLAM/VAN_ex/dataset/sequences/05/'
-DB_PATH = r'/cs/usr/nava.goetschel/SLAM/VAN_ex/code/DB/'
-GROUND_TRUTH_PATH = "/cs/usr/nava.goetschel/SLAM/VAN_ex/dataset/poses/05.txt"
+DATA_PATH = r'/mnt/c/Users/Miryam/SLAM/VAN_ex/dataset/sequences/05/'
+DB_PATH = r'/mnt/c/Users/Miryam/SLAM/VAN_ex/code/DB/'
+GROUND_TRUTH_PATH = '/mnt/c/Users/Miryam/SLAM/VAN_ex/dataset/poses/05.txt'
 
 
 def read_images(idx):

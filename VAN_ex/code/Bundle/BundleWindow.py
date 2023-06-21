@@ -211,7 +211,7 @@ class BundleWindow:
         plt.savefig(output_path)
 
     def get_marginals(self):
-        print("get marginals of window: ", self._first_keyframe_id, ", ", self._last_keyframe_id)
+        # print("get marginals of window: ", self._first_keyframe_id, ", ", self._last_keyframe_id)
         return gtsam.Marginals(self._graph, self._current_values)
 
     def get_current_values(self):

@@ -58,15 +58,17 @@ def localization_error():
 if __name__ == '__main__':
     db = DataBase()
     db.read_database(utils.DB_PATH)
+    print("finished read data")
     bundle_adjustment = BundleAdjustment(2560, 20, db)
     bundle_adjustment.optimize_all_windows()
+    print("finished bundle adjustment")
     pose_graph = PoseGraph(bundle_adjustment)
     global_poses = pose_graph.get_global_keyframes_poses()
     global_locations = BundleAdjustment.from_poses_to_locations(global_poses)
 
+    print("starting loop closure")
     loop_closure = LoopClosure(db, pose_graph, 1, 50)  # todo:we are not sure about threshold + add default values
-    loops_dict = loop_closure.find_loops()
-    pose_graph.optimize() # todo: we should call it after each n iteration?
+    loops_dict = loop_closure.find_loops(OUTPUT_DIR)
 
     # 7.5
     print(f"Number of successful loop closures that were detected: {len(loops_dict)}")
