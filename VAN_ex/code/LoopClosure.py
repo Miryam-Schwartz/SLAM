@@ -22,7 +22,19 @@ class LoopClosure:
     def detect_possible_candidates(self, n_keyframe, prev_keyframes):
         # 7.1
         # assume this func return list of keyframes that are candidates of n_keyframe
-        pass
+        possible_cantidates = []
+        n_pose = self._pose_graph.get_pose_obj(n_keyframe)
+        for i_keyframe in prev_keyframes:
+            i_pose = self._pose_graph.get_pose_obj(i_keyframe)
+            rel_cov = self._pose_graph.get_relative_covariance(i_keyframe, n_keyframe)
+            rel_pose = n_pose.between(i_pose)       # todo: make sure
+            rotation = rel_pose.rotation()
+            rel_pose =\
+                np.array([rotation.pitch(), rotation.roll(), rotation.yaw(), rel_pose.x(), rel_pose.y(), rel_pose.z()])
+            mahalanubis_dist = rel_pose.T @ rel_cov @ rel_pose
+            if mahalanubis_dist < self._threshold_close:
+                possible_cantidates.append(i_keyframe)
+        return possible_cantidates
 
     def consensus_matching(self, i_keyframe, n_keyframe):
         # 7.2
@@ -50,7 +62,7 @@ class LoopClosure:
                         self.bundle_for_two_frames(i_keyframe, n_keyframe, extrinsic_camera_mat_i_to_n_left,
                                                    inliers_matches)
                     # 7.4
-                    self._pose_graph.add_loop_factor(i_keyframe, n_keyframe, pose_i_to_n, cov_i_to_n)
+                    self._pose_graph.add_factor(i_keyframe, n_keyframe, pose_i_to_n, cov_i_to_n)
                     self._pose_graph.optimize()
             if j % interval_len == 0:
                 self._pose_graph.show(f"{OUTPUT_DIR}pose_graph_after_iteration_{j}.png", j)

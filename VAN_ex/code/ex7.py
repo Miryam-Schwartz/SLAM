@@ -13,7 +13,6 @@ from VAN_ex.code.PoseGraph import PoseGraph
 OUTPUT_DIR = 'results/ex7/'
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-
 def from_idx_to_pixels(db, i_keyframe, n_keyframe, matches):
     i_pixels, n_pixels = np.empty(len(matches), 2), np.empty(len(matches), 2)
     i_frame_obj = db.get_frame_obj(i_keyframe)
