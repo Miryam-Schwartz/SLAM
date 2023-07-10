@@ -18,7 +18,7 @@ def read_match_and_straighten(frame_id):
         utils.rectified_stereo_pattern_test(kp_left, des_left, kp_right, des_right, 2)
     kp_left = [kp.pt for kp in kp_left]
     kp_right = [kp.pt for kp in kp_right]
-    return kp_left, des_left, kp_right, des_right
+    return np.array(kp_left), np.array(des_left), np.array(kp_right), np.array(des_right)
 
 
 def RANSAC(first_frame_id, second_frame_id):
@@ -32,7 +32,8 @@ def RANSAC(first_frame_id, second_frame_id):
     size = len(matches)
     max_supporters_num = 0
     idxs_max_supports_matches = None
-    while eps > 0 and i < utils.calc_max_iterations(p, eps, 4):
+    while eps > 0 and i < utils.calc_max_iterations(p, eps, 4) and i < 1000:
+        # print("i = ", i)
         points_2d, points_3d = _sample_4_points(kp_left_first, kp_right_first, kp_left_second, matches)
         extrinsic_camera_mat_second_frame_left, extrinsic_camera_mat_second_frame_right = \
             utils.estimate_second_frame_mats_pnp(points_2d, points_3d, INDENTATION_RIGHT_CAM_MAT, K)
@@ -43,12 +44,16 @@ def RANSAC(first_frame_id, second_frame_id):
                                                          extrinsic_camera_mat_second_frame_left,
                                                          extrinsic_camera_mat_second_frame_right)
         supporters_num = len(idxs_of_supporters_matches)
+        # print("suporters num ", idxs_of_supporters_matches)
         if supporters_num > max_supporters_num:
             max_supporters_num = supporters_num
             idxs_max_supports_matches = idxs_of_supporters_matches
             # update eps
             eps = (size - max_supporters_num) / size
         i += 1
+    print(f"max supportes num: {max_supporters_num}, inliers percentage: {max_supporters_num / size}")
+    if max_supporters_num <= 6:
+        return None, None, None, None, None, None, None
     points_3d_supporters = np.empty((max_supporters_num, 3))
     points_2d_supporters = np.empty((max_supporters_num, 2))
     for i in range(max_supporters_num):
@@ -65,6 +70,8 @@ def RANSAC(first_frame_id, second_frame_id):
         _find_supporters(matches, kp_left_first, kp_right_first, kp_left_second, kp_right_second,
                          extrinsic_camera_mat_second_frame_left,
                          extrinsic_camera_mat_second_frame_right)
+    if len(idxs_max_supports_matches) == 0:
+        return None, None, None, None, None, None, None
     matches = np.array(matches)
     idxs_max_supports_matches = np.array(idxs_max_supports_matches)
     return extrinsic_camera_mat_second_frame_left,\

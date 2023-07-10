@@ -13,8 +13,8 @@ from Bundle.BundleWindow import BundleWindow
 
 
 def extract_matches(matches, kp_left_first, kp_right_first, kp_left_second, kp_right_second):
-    first_pixels = np.empty(matches.shape[0], 3)
-    second_pixels = np.empty(matches.shape[0], 3)
+    first_pixels = np.empty((matches.shape[0], 3))
+    second_pixels = np.empty((matches.shape[0], 3))
     for i, match in enumerate(matches):
         idx_kp_first = match[0]
         idx_kp_second = match[1]
@@ -26,15 +26,15 @@ def extract_matches(matches, kp_left_first, kp_right_first, kp_left_second, kp_r
 def convert_idx_to_coordinate(idx_kp, kp_left, kp_right):
     x_left_first, y_left_first = kp_left[idx_kp]
     x_right_first, y_right_first = kp_right[idx_kp]
-    return np.array([x_left_first, x_right_first, np.average(y_left_first, y_right_first)])
+    return np.array([x_left_first, x_right_first, (y_left_first + y_right_first)/2])
 
 
 class LoopClosure:
-    def __init__(self, db, pose_graph, threshold_close, threshold_inliers_num):
+    def __init__(self, db, pose_graph, threshold_close, threshold_inliers_rel):
         self._db = db
         self._pose_graph = pose_graph
         self._threshold_close = threshold_close
-        self._threshold_inliers_num = threshold_inliers_num
+        self._threshold_inliers_rel = threshold_inliers_rel
 
     def detect_possible_candidates(self, n_keyframe, prev_keyframes):
         # 7.1
@@ -42,13 +42,16 @@ class LoopClosure:
         possible_cantidates = []
         n_pose = self._pose_graph.get_pose_obj(n_keyframe)
         for i_keyframe in prev_keyframes:
+            if i_keyframe + 100 >= n_keyframe:
+                continue
             i_pose = self._pose_graph.get_pose_obj(i_keyframe)
             rel_cov = self._pose_graph.get_relative_covariance(i_keyframe, n_keyframe)
             rel_pose = n_pose.between(i_pose)       # todo: make sure
             rotation = rel_pose.rotation()
             rel_pose =\
                 np.array([rotation.pitch(), rotation.roll(), rotation.yaw(), rel_pose.x(), rel_pose.y(), rel_pose.z()])
-            mahalanubis_dist = rel_pose.T @ rel_cov @ rel_pose
+            mahalanubis_dist = (rel_pose.T @ np.linalg.inv(rel_cov) @ rel_pose) ** 0.5
+            # print("mahalanubis dist: ", mahalanubis_dist)
             if mahalanubis_dist < self._threshold_close:
                 possible_cantidates.append(i_keyframe)
         return possible_cantidates
@@ -57,6 +60,8 @@ class LoopClosure:
         # 7.2
         extrinsic_camera_mat_second_frame_left, inliers_matches, outliers_matches, \
             kp_left_first, kp_right_first, kp_left_second, kp_right_second = RANSAC.RANSAC(i_keyframe, n_keyframe)
+        if kp_right_first is None:
+            return None, None, None, None, None
         inliers_i, inliers_n =\
             extract_matches(inliers_matches, kp_left_first, kp_right_first, kp_left_second, kp_right_second)
         outliers_i, outliers_n =\
@@ -68,23 +73,29 @@ class LoopClosure:
         keyframes_list = self._pose_graph.get_keyframes()
         interval_len = int(len(keyframes_list) / 6)
         for j, n_keyframe in enumerate(keyframes_list):
-            print("keyframe ", n_keyframe)
+            print("---keyframe ", n_keyframe)
             prev_keyframes = [kf for kf in keyframes_list if kf < n_keyframe]
             candidates = self.detect_possible_candidates(n_keyframe, prev_keyframes)
             for i_keyframe in candidates:
+                print("candidate: ", i_keyframe)
                 extrinsic_camera_mat_i_to_n_left, inliers_i, inliers_n, outliers_i, outliers_n = \
                     self.consensus_matching(i_keyframe, n_keyframe)
-                if inliers_i.shape[0] > self._threshold_inliers_num:
+                if extrinsic_camera_mat_i_to_n_left is None:
+                    continue
+                if inliers_i.shape[0] / (inliers_i.shape[0] + outliers_i.shape[0]) > self._threshold_inliers_rel:
                     loops_dict[(i_keyframe, n_keyframe)] = (inliers_i, inliers_n, outliers_i, outliers_n)
                     pose_i_to_n, cov_i_to_n = \
                         self.bundle_for_two_frames(i_keyframe, n_keyframe, extrinsic_camera_mat_i_to_n_left,
                                                    inliers_i, inliers_n)
                     # 7.4
+                    print("pose graph error before adding a factor: ", self._pose_graph.total_factor_error())
                     self._pose_graph.add_factor(i_keyframe, n_keyframe, pose_i_to_n, cov_i_to_n)
                     print(f"add loop {i_keyframe} to {n_keyframe}")
                     self._pose_graph.optimize()
+                    print("pose graph error after adding a factor: ", self._pose_graph.total_factor_error())
             if j % interval_len == 0:
-                self._pose_graph.show(f"{output_dir}pose_graph_after_iteration_{j}.png", j)
+                # print("create graph:")
+                self._pose_graph.show(f"{output_dir}pose_graph_after_keyframe_{n_keyframe}.png", n_keyframe)
         return loops_dict
 
     def bundle_for_two_frames(self, i_keyframe, n_keyframe, extrinsic_i_to_n, inliers_i, inliers_n):

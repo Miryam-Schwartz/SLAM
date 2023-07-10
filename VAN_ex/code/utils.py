@@ -270,7 +270,7 @@ def get_stereo_point2(db, frame_id, kp_idx):
 def keyframes_localization_error(alg, global_locations, ground_truth_locations, initial_estimate, output_path):
     keyframes = alg.get_keyframes()
     keyframe_localization_error = np.sum((ground_truth_locations[keyframes] - global_locations) ** 2, axis=-1) ** 0.5
-    initial_estimate_error = np.sum((ground_truth_locations[keyframes] - initial_estimate[keyframes]) ** 2,
+    initial_estimate_error = np.sum((ground_truth_locations[keyframes] - initial_estimate) ** 2,
                                     axis=-1) ** 0.5
     fig = go.Figure()
     fig.add_trace(

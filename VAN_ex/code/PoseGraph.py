@@ -90,7 +90,7 @@ class PoseGraph:
     def get_relative_covariance(self, i_keyframe, n_keyframe):
         # find the shortest path and sum the covariance
         path = nx.shortest_path(self._shortest_path_graph, source=i_keyframe, target=n_keyframe, weight='weight')
-        sum_cov = np.zeros(6, 6)
+        sum_cov = np.zeros((6, 6))
         for i in range(len(path)-1):
             sum_cov += self._factor_covariances[(path[i], path[i+1])]
         return sum_cov
