@@ -1,8 +1,6 @@
 import os
 
 import numpy as np
-import plotly.express as px
-import plotly.graph_objs as go
 from matplotlib import pyplot as plt
 
 from VAN_ex.code import utils
@@ -14,6 +12,7 @@ from VAN_ex.code.PoseGraph import PoseGraph
 OUTPUT_DIR = 'results/ex7/'
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+
 def from_idx_to_pixels(db, i_keyframe, n_keyframe, matches):
     i_pixels, n_pixels = np.empty(len(matches), 2), np.empty(len(matches), 2)
     i_frame_obj = db.get_frame_obj(i_keyframe)
@@ -24,28 +23,9 @@ def from_idx_to_pixels(db, i_keyframe, n_keyframe, matches):
     return i_pixels, n_pixels
 
 
-# def plot_match_results(keyframe_id, inliers, outliers):
-#     img_l, _ = utils.read_images(keyframe_id)
-#     fig = px.imshow(img_l, color_continuous_scale='gray')
-#     fig.update_traces(dict(showscale=False, coloraxis=None, colorscale='gray'))
-#     fig.add_trace(
-#         go.Scatter(x=inliers[:, 0], y=inliers[:, 1],
-#                    marker=dict(color='red', size=5), name='inliers'))
-#     fig.add_trace(
-#         go.Scatter(x=outliers[:, 0], y=outliers[:, 1],
-#                    marker=dict(color='blue', size=5), name='outliers'))
-#     fig.update_layout(title=dict(text=f"Keyframe id :{keyframe_id}"))
-#     fig.write_html(f'{OUTPUT_DIR}inliers_and_outliers_{keyframe_id}.html')
-
-
 def plot_supporters(i_keyframe, n_keyframe, inliers_i, inliers_n, outliers_i, outliers_n):
     fig = plt.figure(figsize=(10, 7))
     rows, cols = 2, 1
-
-    perc_title = ""
-    # if left1_matches_coor is not None:
-    #     inliers_perc = format(inliers_perc, ".2f")
-    #     perc_title = f"supporters({inliers_perc}% inliers, {INLIER_COLOR})"
 
     fig.suptitle(f'inliers and outliers between keyframe {i_keyframe} to {n_keyframe}')
 
@@ -77,15 +57,6 @@ def plot_match():
     plot_supporters(i_keyframe, n_keyframe, inliers_i, inliers_n, outliers_i, outliers_n)
 
 
-def localization_error():
-    global_poses_optimized = pose_graph.get_global_keyframes_poses()
-    global_locations_optimized = BundleAdjustment.from_poses_to_locations(global_poses_optimized)
-    ground_truth_matrices = utils.read_ground_truth_matrices()
-    ground_truth_locations = utils.calculate_ground_truth_locations_from_matrices(ground_truth_matrices)
-    utils.keyframes_localization_error(pose_graph, global_locations_optimized, ground_truth_locations, global_locations,
-                                       f'{OUTPUT_DIR}location_error_before_and_after.png')
-
-
 if __name__ == '__main__':
     db = DataBase()
     db.read_database(utils.DB_PATH)
@@ -98,7 +69,8 @@ if __name__ == '__main__':
     global_locations = BundleAdjustment.from_poses_to_locations(global_poses)
 
     print("starting loop closure")
-    loop_closure = LoopClosure(db, pose_graph, threshold_close=500, threshold_inliers_rel=0.4)  # todo:we are not sure about threshold + add default values
+    loop_closure = LoopClosure(db, pose_graph, threshold_close=500,
+                               threshold_inliers_rel=0.4)
     loops_dict = loop_closure.find_loops(OUTPUT_DIR)
 
     # 7.5
@@ -107,7 +79,22 @@ if __name__ == '__main__':
 
     plot_match()
 
-    localization_error()
+    global_poses_optimized = pose_graph.get_global_keyframes_poses()
+    global_locations_optimized = BundleAdjustment.from_poses_to_locations(global_poses_optimized)
+    ground_truth_matrices = utils.read_ground_truth_matrices()
+    ground_truth_locations = utils.calculate_ground_truth_locations_from_matrices(ground_truth_matrices)
 
+    utils.keyframes_localization_error(pose_graph, global_locations_optimized, ground_truth_locations, global_locations,
+                                       f'{OUTPUT_DIR}location_error_before_and_after.png')
 
-
+    fig, ax = plt.subplots(figsize=(19.2, 14.4))
+    ax.scatter(x=ground_truth_locations[:, 0], y=ground_truth_locations[:, 2],
+               label='Ground Truth', s=2, alpha=0.4, c='tab:blue')
+    ax.scatter(x=global_locations[:, 0], y=global_locations[:, 2],
+               label='Bundle Adjustment', s=10, alpha=0.7, c='tab:green')
+    ax.scatter(x=global_locations_optimized[:, 0], y=global_locations_optimized[:, 2],
+               label='Loop Closure', s=30, alpha=0.7, c='tab:red')
+    ax.legend(fontsize='20')
+    plt.xlabel('x')
+    plt.ylabel('z')
+    plt.savefig(f'{OUTPUT_DIR}localization.png')

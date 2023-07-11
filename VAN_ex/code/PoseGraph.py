@@ -21,7 +21,7 @@ class PoseGraph:
         self._graph = gtsam.NonlinearFactorGraph()
         self._factors = dict()
         self._init_factors()
-        sigmas = np.array([(1 * np.pi / 180) ** 2] * 3 + [1e-1, 1, 1e-1])
+        sigmas = np.array([(1 * np.pi / 180) ** 2] * 3 + [10e-1, 10, 10e-1])
         cov = gtsam.noiseModel.Diagonal.Sigmas(sigmas=sigmas)
         self._prior_factor = \
             gtsam.PriorFactorPose3(gtsam.symbol(CAMERA_SYMBOL, 0), gtsam.Pose3(), cov)
@@ -47,26 +47,14 @@ class PoseGraph:
         for keyframes_tuple, motion in relative_motions.items():
             first_keyframe_id, second_keyframe_id = keyframes_tuple
             self.add_factor(first_keyframe_id, second_keyframe_id, motion, relative_covs[keyframes_tuple])
-            # noise_model = gtsam.noiseModel.Gaussian.Covariance(relative_covs[keyframes_tuple])
-            # factor = gtsam.BetweenFactorPose3 \
-            #     (gtsam.symbol(CAMERA_SYMBOL, first_keyframe_id), gtsam.symbol(CAMERA_SYMBOL, second_keyframe_id),
-            #      motion, noise_model)
-            # factors[keyframes_tuple] = factor
-            # self._shortest_path_graph.add_edge(first_keyframe_id, second_keyframe_id,
-            #                                    weight=cov_weight_square_det(relative_covs[keyframes_tuple]))
-
-    # def _init_graph(self):
-    #     graph = gtsam.NonlinearFactorGraph()
-    #     for factor in self._factors.values():
-    #         graph.add(factor)
-    #     graph.add(self._prior_factor)
-    #     return graph
 
     def optimize(self):
+        self._initial_estimate = self._current_values
+        self._optimizer = gtsam.LevenbergMarquardtOptimizer(self._graph, self._initial_estimate)
         self._current_values = self._optimizer.optimize()
-        return self._current_values  # returns values object
+        return self._current_values
 
-    def get_global_keyframes_poses(self):
+    def  get_global_keyframes_poses(self):
         poses = dict()  # key = keyframe, val = pose
         poses[0] = self._current_values.atPose3(gtsam.symbol(CAMERA_SYMBOL, 0))
         for keyframes_tuple in self._factors:
@@ -97,11 +85,6 @@ class PoseGraph:
 
     def get_keyframes(self):
         return self._bundle_adjustment.get_keyframes()
-        # keyframes_lst = set()
-        # for keyframes_tuple in self._factors.keys():
-        #     set.add(keyframes_tuple[0])
-        #     set.add(keyframes_tuple[1])
-        # return list(keyframes_lst)
 
     def add_factor(self, i_keyframe, n_keyframe, pose_i_to_n, cov):
         noise_model = gtsam.noiseModel.Gaussian.Covariance(cov)

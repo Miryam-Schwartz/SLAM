@@ -51,7 +51,7 @@ def RANSAC(first_frame_id, second_frame_id):
             # update eps
             eps = (size - max_supporters_num) / size
         i += 1
-    print(f"max supportes num: {max_supporters_num}, inliers percentage: {max_supporters_num / size}")
+    # print(f"max supportes num: {max_supporters_num}, inliers percentage: {max_supporters_num / size}")
     if max_supporters_num <= 6:
         return None, None, None, None, None, None, None
     points_3d_supporters = np.empty((max_supporters_num, 3))
