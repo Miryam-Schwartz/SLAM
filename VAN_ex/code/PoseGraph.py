@@ -72,6 +72,16 @@ class PoseGraph:
     def get_marginals(self):
         return gtsam.Marginals(self._graph, self._current_values)
 
+    def get_covraince_all_poses(self):
+        marginals = self.get_marginals()
+        keyframes = self._bundle_adjustment.get_keyframes()
+        cov_list = []
+        for id_keyframe in keyframes:
+            cur_symbol = gtsam.symbol(CAMERA_SYMBOL, id_keyframe)
+            cur_cov = marginals.marginalCovariance(cur_symbol)
+            cov_list.append(cur_cov)
+        return cov_list
+
     def get_current_values(self):
         return self._current_values
 

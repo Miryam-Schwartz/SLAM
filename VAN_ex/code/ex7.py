@@ -57,6 +57,26 @@ def plot_match():
     plot_supporters(i_keyframe, n_keyframe, inliers_i, inliers_n, outliers_i, outliers_n)
 
 
+def plot_location_uncertainty(cov_list_before, cov_list_after, keyframs):
+    det_cov_before = [np.sqrt(np.linalg.det(before_cov)) for before_cov in cov_list_before]
+    det_cov_after = [np.sqrt(np.linalg.det(after_cov)) for after_cov in cov_list_after]
+    keyframs = np.array(keyframs)
+    det_cov_before = np.array(det_cov_before)
+    det_cov_after = np.array(det_cov_after)
+
+    fig = plt.figure()
+    plt.title("Location uncertainty before and after Loop Closure")
+    plt.plot(keyframs, det_cov_before, label="Before")
+    plt.plot(keyframs, det_cov_after, label="After")
+    plt.yscale('log')
+    plt.ylabel("uncertainty -sqrt covariance determinate")
+    plt.xlabel("Keyframe")
+    plt.legend()
+
+    fig.savefig(f'{OUTPUT_DIR}uncertainty_before_after_loop_closure.png')
+    plt.close(fig)
+
+
 if __name__ == '__main__':
     db = DataBase()
     db.read_database(utils.DB_PATH)
@@ -71,7 +91,9 @@ if __name__ == '__main__':
     print("starting loop closure")
     loop_closure = LoopClosure(db, pose_graph, threshold_close=500,
                                threshold_inliers_rel=0.4)
+    cov_list_before = pose_graph.get_covraince_all_poses()
     loops_dict = loop_closure.find_loops(OUTPUT_DIR)
+    cov_list_after = pose_graph.get_covraince_all_poses()
 
     # 7.5
     print(f"Number of successful loop closures that were detected: {len(loops_dict)}")
@@ -98,3 +120,5 @@ if __name__ == '__main__':
     plt.xlabel('x')
     plt.ylabel('z')
     plt.savefig(f'{OUTPUT_DIR}localization.png')
+
+    plot_location_uncertainty(cov_list_before, cov_list_after, bundle_adjustment.get_keyframes())
