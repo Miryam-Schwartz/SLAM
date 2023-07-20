@@ -235,15 +235,16 @@ def ex2_run():
     our_dots_rect_tst = triangulation_list_of_points(img1_inliers, img2_inliers, triangulation_single_match)
     show_dots_3d_cloud(our_dots_rect_tst, f"{OUTPUT_DIR}our_3D_points_cloud_img0_rectified_test.html")
 
-    # image 0 points cloud with removing point where right_x >left_x
+    # image 0 points cloud with removing point where right_x > left_x
     kp1_clean, kp2_clean = [], []
     for i in range(len(kp1)):
         left_x = kp1[i].pt[0]
         right_x = kp2[i].pt[0]
-        if(right_x <= left_x):
+        if (right_x <= left_x):
             kp1_clean.append(kp1[i])
             kp2_clean.append(kp2[i])
     dots_3d_clean = triangulation_list_of_points(kp1_clean, kp2_clean, triangulation_single_match)
     show_dots_3d_cloud(dots_3d_clean, f"{OUTPUT_DIR}our_3D_points_cloud_img{0}_clean.html")
+
 
 ex2_run()

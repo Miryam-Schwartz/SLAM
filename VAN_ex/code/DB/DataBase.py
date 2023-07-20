@@ -120,6 +120,17 @@ class DataBase:
             locations[frame_id] = left_cam_location
         return locations
 
+    def get_left_camera_mats_in_world_coordinates(self):
+        concat_r, concat_t = np.identity(3), np.zeros(3)
+        mats = []
+        for frame_id, frame_obj in self._frames_dict.items():
+            pose_mat = frame_obj.get_left_camera_pose_mat()
+            cur_r, cur_t = pose_mat[:, :3], pose_mat[:, 3]
+            concat_r = cur_r @ concat_r
+            concat_t = cur_r @ concat_t + cur_t
+            mats[frame_id] = np.hstack(concat_r, concat_t)
+        return mats
+
     # ================ Tracking Statistics ================ #
 
     def get_mean_max_and_min_track_len(self):
@@ -429,3 +440,4 @@ class DataBase:
                 # frame_id, x, y, z = int(row[0]), float(row[1]), float(row[2]), float(row[3])
                 # assume frames_dict is full
                 self._frames_dict[frame_id].set_left_camera_pose_mat(row)
+

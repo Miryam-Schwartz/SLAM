@@ -145,6 +145,9 @@ class BundleWindow:
             error += factor.error(self._current_values)
         return error
 
+    def get_mean_factors_error(self):
+        return self.total_factor_error() / len(self._factors)
+
     def get_random_factor(self):
         factor_key = random.choice(list(self._factors.keys()))
         return factor_key
@@ -226,3 +229,7 @@ class BundleWindow:
         marginals = self.get_marginals()
         sliced_inform_mat = marginals.jointMarginalInformation(keys).at(keys[-1], keys[-1])
         return np.linalg.inv(sliced_inform_mat)
+
+    # todo
+    def get_median_projection_error(self):
+        pass

@@ -101,7 +101,7 @@ class Frame:
 
     def get_left_camera_pose_mat(self):
         if self._left_camera_pose_mat is None:
-            raise "pse is None"
+            raise "pose is None"
         return self._left_camera_pose_mat
 
     def get_inliers_percentage(self):

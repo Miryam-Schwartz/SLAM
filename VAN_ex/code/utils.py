@@ -2,6 +2,7 @@ import cv2 as cv
 import gtsam
 import numpy as np
 # from matplotlib import pyplot as plt
+import plotly.express as px
 import plotly.graph_objs as go
 from matplotlib import pyplot as plt
 
@@ -280,3 +281,48 @@ def keyframes_localization_error(alg, global_locations, ground_truth_locations, 
     fig.update_layout(title="Keyframe localization error over time",
                       xaxis_title='Keyframe id', yaxis_title='localization error')
     fig.write_image(output_path)
+
+def inliers_percentage_graph(db, output_path):
+    """
+    Create and save inliers percentage graph -
+    for each frame, the percentage of inliers out of all the features that were matched.
+    Note: only inliers were been saved in the db, then, inliers percentage were calculated
+    and saved before removing outliers
+    :param db: database
+    """
+    frames_num = db.get_frames_number()
+    inliers_percentage = np.empty(frames_num)
+    for i in range(frames_num):
+        inliers_percentage[i] = db.get_frame_obj(i).get_inliers_percentage()
+    fig = px.line(x=np.arange(frames_num), y=inliers_percentage, title="Inliers percentage per frame",
+                  labels={'x': 'Frame', 'y': 'Inliers Percentage'})
+    fig.write_image(f"{output_path}inliers_percentage_graph.png")
+
+def connectivity_graph(db, output_path):
+    """
+    Create and save a connectivity graph from the dataa base
+    (For each frame, the number of tracks outgoing to the next frame)
+    :param db: database
+    """
+    frames_num = db.get_frames_number()
+    outgoing_frames = np.empty(frames_num)
+    for i in range(frames_num):
+        outgoing_frames[i] = db.get_frame_obj(i).get_number_outgoing_tracks()
+    fig = px.line(x=np.arange(frames_num), y=outgoing_frames, title="Connectivity",
+                  labels={'x': 'Frame', 'y': 'Outgoing tracks'})
+    fig.write_image(f"{output_path}connectivity_graph.png")
+
+
+def tracks_length_histogram(db, output_path):
+    """
+    Create and save tracks length histogram (how many tracks are in a specific length)
+    :param db:
+    """
+    tracks_number = db.get_tracks_number()
+    tracks_length = np.empty(tracks_number)
+    for i in range(tracks_number):
+        tracks_length[i] = db.get_track_obj(i).get_track_len()
+    unique, count = np.unique(tracks_length, return_counts=True)
+    fig = px.line(x=unique, y=count, title='Tracks Length Histogram',
+                  labels={'x': 'Track length', 'y': 'Track #'})
+    fig.write_image(f'{output_path}tracks_length_histogram.png')

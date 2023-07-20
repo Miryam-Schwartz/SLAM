@@ -71,3 +71,16 @@ class BundleAdjustment:
 
     def get_first_window(self):
         return self._bundle_windows[0]
+
+    def get_mean_factor_error_for_all_windows(self):
+        mean_factor_error = np.empty(len(self._bundle_windows))
+        for i, window in enumerate(self._bundle_windows.values()):
+            mean_factor_error[i] = window.get_mean_factors_error()
+        return mean_factor_error
+
+    def get_median_projection_error_for_all_windows(self):
+        median_projection_error = np.empty(len(self._bundle_windows))
+        for i, window in enumerate(self._bundle_windows.values()):
+            median_projection_error[i] = window.get_median_projection_error()
+        return median_projection_error
+
