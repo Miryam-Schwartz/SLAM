@@ -54,7 +54,7 @@ class PoseGraph:
         self._current_values = self._optimizer.optimize()
         return self._current_values
 
-    def  get_global_keyframes_poses(self):
+    def get_global_keyframes_poses(self):
         poses = dict()  # key = keyframe, val = pose
         poses[0] = self._current_values.atPose3(gtsam.symbol(CAMERA_SYMBOL, 0))
         for keyframes_tuple in self._factors:

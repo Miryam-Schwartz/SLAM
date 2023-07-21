@@ -1,3 +1,5 @@
+import statistics
+
 import gtsam
 import numpy as np
 
@@ -83,4 +85,18 @@ class BundleAdjustment:
         for i, window in enumerate(self._bundle_windows.values()):
             median_projection_error[i] = window.get_median_projection_error()
         return median_projection_error
+
+    def get_median_projection_error_per_distance(self):
+        projection_error_left = dict()       # key = distance from first frame, value = list of projection errors
+        projection_error_right = dict()
+        for window in self._bundle_windows.values():
+            window.calc_projection_error_per_distance(projection_error_left, projection_error_right)
+        distances = np.array(list(projection_error_right.keys()))
+        median_proj_err_left = np.array([statistics.median(projection_error_left[d]) for d in distances])
+        median_proj_err_right = np.array([statistics.median(projection_error_right[d]) for d in distances])
+        return distances, median_proj_err_left, median_proj_err_right
+
+
+
+
 

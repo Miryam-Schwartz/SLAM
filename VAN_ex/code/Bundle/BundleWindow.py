@@ -1,4 +1,5 @@
 import random
+import statistics
 
 import gtsam
 import numpy as np
@@ -230,6 +231,48 @@ class BundleWindow:
         sliced_inform_mat = marginals.jointMarginalInformation(keys).at(keys[-1], keys[-1])
         return np.linalg.inv(sliced_inform_mat)
 
-    # todo
     def get_median_projection_error(self):
-        pass
+        projection_errors_list = []
+        random_track_ids = random.sample(self._tracks, 200)
+        for track_id in random_track_ids:
+            pt_3d = self._current_values.atPoint3(gtsam.symbol(POINT_SYMBOL, track_id))
+            track_obj = self._db.get_track_obj(track_id)
+            frames_dict = track_obj.get_frames_dict()
+            for frame_id, kp_idx in frames_dict.items():
+                if frame_id > self._last_keyframe_id or frame_id < self._first_keyframe_id:
+                    continue
+                pt_2d_real = utils.get_stereo_point2(self._db, frame_id, kp_idx)
+                cam_pose = self._current_values.atPose3(gtsam.symbol(CAMERA_SYMBOL, frame_id))
+                stereo_cam = gtsam.StereoCamera(cam_pose, BundleWindow.K)
+                pt_2d_proj = stereo_cam.project(pt_3d)
+                diff = pt_2d_real - pt_2d_proj
+                diff = np.array([diff.uL(), diff.uR(), diff.v()])
+                projection_errors_list.append(np.linalg.norm(diff))
+        return statistics.median(projection_errors_list)
+
+    def calc_projection_error_per_distance(self, projection_error_left, projection_error_right):
+        random_track_ids = random.sample(self._tracks, 200)
+        for track_id in random_track_ids:
+            pt_3d = self._current_values.atPoint3(gtsam.symbol(POINT_SYMBOL, track_id))
+            track_obj = self._db.get_track_obj(track_id)
+            frames_dict = track_obj.get_frames_dict()
+            for frame_id, kp_idx in frames_dict.items():
+                if frame_id > self._last_keyframe_id or frame_id < self._first_keyframe_id:
+                    continue
+                pt_2d_real = utils.get_stereo_point2(self._db, frame_id, kp_idx)
+                cam_pose = self._current_values.atPose3(gtsam.symbol(CAMERA_SYMBOL, frame_id))
+                stereo_cam = gtsam.StereoCamera(cam_pose, BundleWindow.K)
+                pt_2d_proj = stereo_cam.project(pt_3d)
+                diff = pt_2d_real - pt_2d_proj
+                diff = np.array([diff.uL(), diff.uR(), diff.v()])
+                first_frame = max(self._first_keyframe_id, track_obj.get_first_frame_id())
+                d = frame_id - first_frame
+                if d in projection_error_left:
+                    projection_error_left[d].append(np.linalg.norm(diff[[0, 2]]))
+                    projection_error_right[d].append(np.linalg.norm(diff[[1, 2]]))
+                else:
+                    projection_error_left[d] = [np.linalg.norm(diff[[0, 2]])]
+                    projection_error_right[d] = [np.linalg.norm(diff[[1, 2]])]
+
+
+

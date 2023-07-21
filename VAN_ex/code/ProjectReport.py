@@ -2,6 +2,7 @@ import os
 import random
 import statistics
 
+import cv2 as cv
 import numpy as np
 import plotly.express as px
 from matplotlib import pyplot as plt
@@ -35,7 +36,7 @@ def present_tracking_statistics(database):
     print(f"Mean track length: {mean}\nMaximum track length: {max_t}\nMinimum track length: {min_t}")
     print("Mean number of tracks on average frame: ", database.get_mean_number_of_tracks_on_frame())
     number_of_matches_per_frame_graph(database)
-    utils.inliers_percentage_graph(db, output_path=OUTPUT_DIR)
+    # utils.inliers_percentage_graph(db, output_path=OUTPUT_DIR)
 
 
 def show_locations_trajectory(ground_truth_locations, pnp_locations, bundle_adjustment_locations,
@@ -110,9 +111,65 @@ def PnP_median_projection_error_per_distance_from_last_frame():
                       xaxis_title='distance from last frame', yaxis_title='projection error')
     fig.write_image(f'{OUTPUT_DIR}PnP_median_projection_error_vs_track_length.png')
 
+def from_gtsam_poses_to_world_coordinates_mats(poses_list):
+    mats_list = []
+    for pose in poses_list:
+        rotation = pose.rotation()
+        r_vec = np.array([rotation.pitch(), rotation.roll(), rotation.yaw()])
+        t_vec = np.array([pose.x(), pose.y(), pose.z()])
+        r_mat, _ = cv.Rodrigues(r_vec)
+        r_extrinsic, t_extrinsic = utils.invert_extrinsic_matrix(r_mat, t_vec)
+        mats_list.append(np.hstack(r_extrinsic, t_extrinsic))
+    return mats_list
+
 
 def BA_median_projection_error_per_distance_from_first_frame():
-    pass
+    distances, median_proj_err_left, median_proj_err_right = bundle_adjustment.get_median_projection_error_per_distance()
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=distances, y=median_proj_err_left, mode='lines', name='left'))
+    fig.add_trace(go.Scatter(x=distances, y=median_proj_err_right, mode='lines', name='right'))
+    fig.update_layout(title='BA - median projection error vs distance from first frame',
+                      xaxis_title='distance from first frame', yaxis_title='projection error')
+    fig.write_image(f'{OUTPUT_DIR}BA_median_projection_error_vs_distance_From_first_frame.png')
+
+
+def plot_location_error_along_axes(ground_truth, estimation, title):
+    # ground truth and estimation is list of locations (vector with 3 coordinates)
+    diff = ground_truth - estimation
+    x_error = diff[:, 0]
+    y_error = diff[:, 1]
+    z_error = diff[:, 2]
+    norm_error = np.sum(diff ** 2, axis=-1) ** 0.5
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=keyframes_list, y=x_error, mode='lines', name='x'))
+    fig.add_trace(go.Scatter(x=keyframes_list, y=y_error, mode='lines', name='y'))
+    fig.add_trace(go.Scatter(x=keyframes_list, y=z_error, mode='lines', name='z'))
+    fig.add_trace(go.Scatter(x=keyframes_list, y=norm_error, mode='lines', name='norm'))
+
+    fig.update_layout(title=f'Axes Estimation Error - {title}', xaxis_title='Keyframe id', yaxis_title='error')
+    fig.write_image(f'{OUTPUT_DIR}axes_estimation_error_{title}.png')
+
+
+def plot_angle_error(ground_truth_matrices, estimation_mats, title):
+    length = len(ground_truth_matrices)
+    angle_error = np.empty(length)
+    for i in range(length):
+        gt_vec, _ = cv.Rodrigues(ground_truth_matrices[i][:, 3])
+        est_vec, _ = cv.Rodrigues(estimation_mats[i][:, 3])
+        angle_error[i] = np.linalg.norm(gt_vec - est_vec)
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=keyframes_list, y=angle_error, mode='lines', name='angle'))
+
+    fig.update_layout(title=f'Angle Estimation Error - {title}', xaxis_title='Keyframe id', yaxis_title='error')
+    fig.write_image(f'{OUTPUT_DIR}angle_estimation_error_{title}.png')
+
+
+def loop_closure_statistics():
+    print("Number of Matches and Inliers Percentage in loop closure:")
+    for loop, inliers_and_outliers in loops_dict.items():
+        inliers_i, inliers_n, outliers_i, outliers_n = inliers_and_outliers
+        inliers_percentage = (len(inliers_i) / (len(inliers_i) + len(outliers_i))) * 100
+        print(f"loop {loop}: matches number - {len(inliers_i)}, inliers percentage - {inliers_percentage}")
 
 
 if __name__ == '__main__':
@@ -121,7 +178,8 @@ if __name__ == '__main__':
 
     db = DataBase()
     db.read_database(utils.DB_PATH)
-    pnp_locations = db.get_camera_locations()
+    pnp_mats = db.get_left_camera_mats_in_world_coordinates()
+    pnp_locations = utils.calculate_ground_truth_locations_from_matrices(pnp_mats)
     print("finished read data")
 
     bundle_adjustment = BundleAdjustment(2560, 20, db)
@@ -133,8 +191,10 @@ if __name__ == '__main__':
 
     mean_factor_error_after = bundle_adjustment.get_mean_factor_error_for_all_windows()
     median_projection_error_after = bundle_adjustment.get_median_projection_error_for_all_windows()
+    bundle_adjustment_poses = bundle_adjustment.get_global_keyframes_poses()
+    bundle_adjustment_mats = from_gtsam_poses_to_world_coordinates_mats(bundle_adjustment_poses)
     bundle_adjustment_locations = \
-        BundleAdjustment.from_poses_to_locations(bundle_adjustment.get_global_keyframes_poses())
+        BundleAdjustment.from_poses_to_locations(bundle_adjustment_poses)
     print("finished bundle adjustment")
 
     pose_graph = PoseGraph(bundle_adjustment)
@@ -142,7 +202,9 @@ if __name__ == '__main__':
     loop_closure = LoopClosure(db, pose_graph, threshold_close=500,
                                threshold_inliers_rel=0.4)
     loops_dict = loop_closure.find_loops(OUTPUT_DIR)
-    loop_closure_locations = BundleAdjustment.from_poses_to_locations(pose_graph.get_global_keyframes_poses())
+    loop_closure_poses = pose_graph.get_global_keyframes_poses()
+    loop_closure_mats = from_gtsam_poses_to_world_coordinates_mats(loop_closure_poses)
+    loop_closure_locations = BundleAdjustment.from_poses_to_locations(loop_closure_poses)
 
     # part 3 - Performance Analysis
     present_tracking_statistics(db)
@@ -159,12 +221,29 @@ if __name__ == '__main__':
         (keyframes_list, mean_factor_error_before, mean_factor_error_after, 'mean factor error')
 
     # median projection error for each window
-    # todo
-    # plot_bundle_error_before_after_opt \
-    #     (keyframes_list, median_projection_error_before, median_projection_error_after, 'median projection error')
+    plot_bundle_error_before_after_opt \
+        (keyframes_list, median_projection_error_before, median_projection_error_after, 'median projection error')
 
     PnP_median_projection_error_per_distance_from_last_frame()
 
     BA_median_projection_error_per_distance_from_first_frame()
+
+    ground_truth_mats_of_keyframes = ground_truth_mats[keyframes_list]
+    ground_truth_locations_of_keyframes = ground_truth_locations[keyframes_list]
+
+    plot_location_error_along_axes(ground_truth_locations_of_keyframes, pnp_locations, 'PnP')
+    plot_angle_error(ground_truth_mats_of_keyframes, pnp_mats, 'PnP')
+
+    plot_location_error_along_axes(ground_truth_locations_of_keyframes, bundle_adjustment_locations, 'BA')  # pose graph without LC
+    plot_angle_error(ground_truth_mats_of_keyframes, bundle_adjustment_mats, 'BA')
+
+    plot_location_error_along_axes(ground_truth_locations_of_keyframes, loop_closure_locations, 'LC')
+    plot_angle_error(ground_truth_mats_of_keyframes, loop_closure_mats, 'LC')
+
+    loop_closure_statistics()
+
+
+
+
 
 

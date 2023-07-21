@@ -55,6 +55,9 @@ class Track:
         max_key = max(self._frames_dict.keys())
         return max_key, self._frames_dict[max_key]  # the last frame and its idx of left kp
 
+    def get_first_frame_id(self):
+        return min(self._frames_dict.keys())
+
     def get_kp_idx_of_frame(self, frame_id):
         """
         :param frame_id:
