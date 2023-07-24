@@ -57,17 +57,17 @@ def plot_match():
     plot_supporters(i_keyframe, n_keyframe, inliers_i, inliers_n, outliers_i, outliers_n)
 
 
-def plot_location_uncertainty(cov_list_before, cov_list_after, keyframs):
+def plot_location_uncertainty(cov_list_before, cov_list_after, keyframes):
     det_cov_before = [np.sqrt(np.linalg.det(before_cov)) for before_cov in cov_list_before]
     det_cov_after = [np.sqrt(np.linalg.det(after_cov)) for after_cov in cov_list_after]
-    keyframs = np.array(keyframs)
+    keyframes = np.array(keyframes)
     det_cov_before = np.array(det_cov_before)
     det_cov_after = np.array(det_cov_after)
 
     fig = plt.figure()
     plt.title("Location uncertainty before and after Loop Closure")
-    plt.plot(keyframs, det_cov_before, label="Before")
-    plt.plot(keyframs, det_cov_after, label="After")
+    plt.plot(keyframes, det_cov_before, label="Before")
+    plt.plot(keyframes, det_cov_after, label="After")
     plt.yscale('log')
     plt.ylabel("uncertainty -sqrt covariance determinate")
     plt.xlabel("Keyframe")

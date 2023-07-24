@@ -41,14 +41,15 @@ def present_tracking_statistics(database):
 
 def show_locations_trajectory(ground_truth_locations, pnp_locations, bundle_adjustment_locations,
                               loop_closure_locations):
+
     fig, ax = plt.subplots(figsize=(19.2, 14.4))
-    ax.plot(x=ground_truth_locations[:, 0], y=ground_truth_locations[:, 2],
+    ax.scatter(x=ground_truth_locations[:, 0], y=ground_truth_locations[:, 2],
             label='Ground Truth', s=2, alpha=0.4, c='tab:blue')
-    ax.plot(x=pnp_locations[:, 0], y=pnp_locations[:, 2],
-            label='PnP', s=10, alpha=0.7, c='tab:yellow')
-    ax.plot(x=bundle_adjustment_locations[:, 0], y=bundle_adjustment_locations[:, 2],
+    ax.scatter(x=pnp_locations[:, 0], y=pnp_locations[:, 2],
+            label='PnP', s=10, alpha=0.7, c='tab:olive')
+    ax.scatter(x=bundle_adjustment_locations[:, 0], y=bundle_adjustment_locations[:, 2],
             label='Bundle Adjustment', s=10, alpha=0.7, c='tab:green')
-    ax.plot(x=loop_closure_locations[:, 0], y=loop_closure_locations[:, 2],
+    ax.scatter(x=loop_closure_locations[:, 0], y=loop_closure_locations[:, 2],
             label='Loop Closure', s=30, alpha=0.7, c='tab:red')
     ax.legend(fontsize='20')
     plt.xlabel('x')
@@ -66,7 +67,7 @@ def plot_bundle_error_before_after_opt(keyframes_list, mean_factor_error_before,
     fig.write_image(f'{OUTPUT_DIR}{title}.png')
 
 
-def PnP_median_projection_error_per_distance_from_last_frame():
+def PnP_median_projection_error_per_distance():
     random_track_ids = random.sample(range(db.get_tracks_number()), 500)
     left_camera_mats_in_world_coordinates = db.get_left_camera_mats_in_world_coordinates()
     # key = distance from last frame of track, value = list of projection errors (from different tracks)
@@ -111,26 +112,28 @@ def PnP_median_projection_error_per_distance_from_last_frame():
                       xaxis_title='distance from last frame', yaxis_title='projection error')
     fig.write_image(f'{OUTPUT_DIR}PnP_median_projection_error_vs_track_length.png')
 
-def from_gtsam_poses_to_world_coordinates_mats(poses_list):
+
+def from_gtsam_poses_to_world_coordinates_mats(poses_dict):
     mats_list = []
-    for pose in poses_list:
+    for pose_id in sorted(poses_dict.keys()):
+        pose = poses_dict[pose_id]
         rotation = pose.rotation()
         r_vec = np.array([rotation.pitch(), rotation.roll(), rotation.yaw()])
         t_vec = np.array([pose.x(), pose.y(), pose.z()])
         r_mat, _ = cv.Rodrigues(r_vec)
         r_extrinsic, t_extrinsic = utils.invert_extrinsic_matrix(r_mat, t_vec)
-        mats_list.append(np.hstack(r_extrinsic, t_extrinsic))
+        mats_list.append(np.hstack((r_extrinsic, t_extrinsic.reshape(3, 1))))
     return mats_list
 
 
-def BA_median_projection_error_per_distance_from_first_frame():
+def BA_median_projection_error_per_distance():
     distances, median_proj_err_left, median_proj_err_right = bundle_adjustment.get_median_projection_error_per_distance()
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=distances, y=median_proj_err_left, mode='lines', name='left'))
     fig.add_trace(go.Scatter(x=distances, y=median_proj_err_right, mode='lines', name='right'))
-    fig.update_layout(title='BA - median projection error vs distance from first frame',
+    fig.update_layout(title='BA - median projection error vs distance from last frame',
                       xaxis_title='distance from first frame', yaxis_title='projection error')
-    fig.write_image(f'{OUTPUT_DIR}BA_median_projection_error_vs_distance_From_first_frame.png')
+    fig.write_image(f'{OUTPUT_DIR}BA_median_projection_error_vs_distance_from_last_frame.png')
 
 
 def plot_location_error_along_axes(ground_truth, estimation, title):
@@ -172,8 +175,37 @@ def loop_closure_statistics():
         print(f"loop {loop}: matches number - {len(inliers_i)}, inliers percentage - {inliers_percentage}")
 
 
+def plot_uncertainty(cov_list_before, cov_list_after, keyframes, title):
+    det_cov_before = [np.sqrt(np.linalg.det(before_cov)) for before_cov in cov_list_before]
+    det_cov_after = [np.sqrt(np.linalg.det(after_cov)) for after_cov in cov_list_after]
+    keyframes = np.array(keyframes)
+    det_cov_before = np.array(det_cov_before)
+    det_cov_after = np.array(det_cov_after)
+
+    fig = plt.figure()
+    plt.title(f"{title} uncertainty before and after Loop Closure")
+    plt.plot(keyframes, det_cov_before, label="Before")
+    plt.plot(keyframes, det_cov_after, label="After")
+    plt.yscale('log')
+    plt.ylabel("uncertainty -sqrt covariance determinate")
+    plt.xlabel("Keyframe")
+    plt.legend()
+
+    fig.savefig(f'{OUTPUT_DIR}{title}_uncertainty_before_after_loop_closure.png')
+    plt.close(fig)
+
+
+def slice_cov_mat_to_localization_angle(cov_list):
+    cov_list_angle = []
+    cov_list_loc = []
+    for cov in cov_list:
+        cov_list_angle.append(cov[:3, :3])
+        cov_list_loc.append(cov[3:, 3:])
+    return cov_list_angle, cov_list_loc
+
+
 if __name__ == '__main__':
-    ground_truth_mats = utils.read_ground_truth_matrices(utils.GROUND_TRUTH_PATH)
+    ground_truth_mats = np.array(utils.read_ground_truth_matrices(utils.GROUND_TRUTH_PATH))
     ground_truth_locations = utils.calculate_ground_truth_locations_from_matrices(ground_truth_mats)
 
     db = DataBase()
@@ -201,7 +233,9 @@ if __name__ == '__main__':
     print("starting loop closure")
     loop_closure = LoopClosure(db, pose_graph, threshold_close=500,
                                threshold_inliers_rel=0.4)
+    full_cov_before_LC = pose_graph.get_covraince_all_poses()
     loops_dict = loop_closure.find_loops(OUTPUT_DIR)
+    full_cov_after_LC = pose_graph.get_covraince_all_poses()
     loop_closure_poses = pose_graph.get_global_keyframes_poses()
     loop_closure_mats = from_gtsam_poses_to_world_coordinates_mats(loop_closure_poses)
     loop_closure_locations = BundleAdjustment.from_poses_to_locations(loop_closure_poses)
@@ -217,24 +251,25 @@ if __name__ == '__main__':
                               loop_closure_locations)
 
     # mean factor error for each window
-    plot_bundle_error_before_after_opt\
+    plot_bundle_error_before_after_opt \
         (keyframes_list, mean_factor_error_before, mean_factor_error_after, 'mean factor error')
 
     # median projection error for each window
     plot_bundle_error_before_after_opt \
         (keyframes_list, median_projection_error_before, median_projection_error_after, 'median projection error')
 
-    PnP_median_projection_error_per_distance_from_last_frame()
+    PnP_median_projection_error_per_distance()  # distance from last frame of track were we computed triangulation
 
-    BA_median_projection_error_per_distance_from_first_frame()
+    BA_median_projection_error_per_distance()  # distance from last frame of min(track, window) were we computed triangulation
 
     ground_truth_mats_of_keyframes = ground_truth_mats[keyframes_list]
     ground_truth_locations_of_keyframes = ground_truth_locations[keyframes_list]
 
-    plot_location_error_along_axes(ground_truth_locations_of_keyframes, pnp_locations, 'PnP')
-    plot_angle_error(ground_truth_mats_of_keyframes, pnp_mats, 'PnP')
+    plot_location_error_along_axes(ground_truth_locations, pnp_locations, 'PnP')
+    plot_angle_error(ground_truth_mats, pnp_mats, 'PnP')
 
-    plot_location_error_along_axes(ground_truth_locations_of_keyframes, bundle_adjustment_locations, 'BA')  # pose graph without LC
+    plot_location_error_along_axes(ground_truth_locations_of_keyframes, bundle_adjustment_locations,
+                                   'BA')  # pose graph without LC
     plot_angle_error(ground_truth_mats_of_keyframes, bundle_adjustment_mats, 'BA')
 
     plot_location_error_along_axes(ground_truth_locations_of_keyframes, loop_closure_locations, 'LC')
@@ -242,8 +277,8 @@ if __name__ == '__main__':
 
     loop_closure_statistics()
 
-
-
-
-
-
+    # uncertainty size vs keyframes
+    covs_angle_before, covs_location_before = slice_cov_mat_to_localization_angle(full_cov_before_LC)
+    covs_angle_after, covs_location_after = slice_cov_mat_to_localization_angle(full_cov_after_LC)
+    plot_uncertainty(covs_angle_before, covs_angle_after, keyframes_list, "Angle")
+    plot_uncertainty(covs_location_before, covs_location_after, keyframes_list, "Location")

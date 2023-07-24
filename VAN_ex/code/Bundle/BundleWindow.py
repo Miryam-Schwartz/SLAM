@@ -256,6 +256,8 @@ class BundleWindow:
             pt_3d = self._current_values.atPoint3(gtsam.symbol(POINT_SYMBOL, track_id))
             track_obj = self._db.get_track_obj(track_id)
             frames_dict = track_obj.get_frames_dict()
+            last_frame_id, _ = track_obj.get_last_frame_id_and_kp_idx()
+            last_frame_id = min(last_frame_id, self._last_keyframe_id)
             for frame_id, kp_idx in frames_dict.items():
                 if frame_id > self._last_keyframe_id or frame_id < self._first_keyframe_id:
                     continue
@@ -266,7 +268,7 @@ class BundleWindow:
                 diff = pt_2d_real - pt_2d_proj
                 diff = np.array([diff.uL(), diff.uR(), diff.v()])
                 first_frame = max(self._first_keyframe_id, track_obj.get_first_frame_id())
-                d = frame_id - first_frame
+                d = last_frame_id - frame_id
                 if d in projection_error_left:
                     projection_error_left[d].append(np.linalg.norm(diff[[0, 2]]))
                     projection_error_right[d].append(np.linalg.norm(diff[[1, 2]]))

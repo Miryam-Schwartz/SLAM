@@ -128,7 +128,7 @@ class DataBase:
             cur_r, cur_t = pose_mat[:, :3], pose_mat[:, 3]
             concat_r = cur_r @ concat_r
             concat_t = cur_r @ concat_t + cur_t
-            mats[frame_id] = np.hstack(concat_r, concat_t)
+            mats.append(np.hstack((concat_r, concat_t.reshape(3, 1))))
         return mats
 
     # ================ Tracking Statistics ================ #
