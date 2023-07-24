@@ -96,6 +96,8 @@ class BundleAdjustment:
         median_proj_err_right = np.array([statistics.median(projection_error_right[d]) for d in distances])
         return distances, median_proj_err_left, median_proj_err_right
 
+    def get_window_len(self):
+        return self._window_len
 
 
 

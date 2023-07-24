@@ -129,7 +129,7 @@ class DataBase:
             concat_r = cur_r @ concat_r
             concat_t = cur_r @ concat_t + cur_t
             mats.append(np.hstack((concat_r, concat_t.reshape(3, 1))))
-        return mats
+        return np.array(mats)
 
     # ================ Tracking Statistics ================ #
 
