@@ -94,7 +94,8 @@ class BundleAdjustment:
         distances = np.array(sorted(projection_error_right.keys()))
         median_proj_err_left = np.array([statistics.median(projection_error_left[d]) for d in distances])
         median_proj_err_right = np.array([statistics.median(projection_error_right[d]) for d in distances])
-        return distances, median_proj_err_left, median_proj_err_right
+        links_num_per_distance = np.array([len(projection_error_right[d]) for d in distances])
+        return distances, median_proj_err_left, median_proj_err_right, links_num_per_distance
 
     def get_window_len(self):
         return self._window_len

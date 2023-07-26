@@ -104,6 +104,7 @@ def PnP_median_projection_error_per_distance():
     distances = np.array(sorted(right_projection_err.keys()))
     median_proj_err_left = np.array([statistics.median(left_projection_err[d]) for d in distances])
     median_proj_err_right = np.array([statistics.median(right_projection_err[d]) for d in distances])
+    links_num_per_distance = np.array([len(right_projection_err[d]) for d in distances])
 
     fig = plt.figure()
     plt.title('PnP - median projection error vs track length')
@@ -115,6 +116,8 @@ def PnP_median_projection_error_per_distance():
 
     fig.savefig(f'{OUTPUT_DIR}PnP_median_projection_error_vs_track_length.png')
     plt.close(fig)
+
+    return distances, links_num_per_distance
 
     # fig = go.Figure()
     # fig.add_trace(go.Scatter(x=distances, y=median_proj_err_left, mode='lines', name='left'))
@@ -138,7 +141,8 @@ def from_gtsam_poses_to_world_coordinates_mats(poses_dict):
 
 
 def BA_median_projection_error_per_distance():
-    distances, median_proj_err_left, median_proj_err_right = bundle_adjustment.get_median_projection_error_per_distance()
+    distances, median_proj_err_left, median_proj_err_right, links_num_per_distance =\
+        bundle_adjustment.get_median_projection_error_per_distance()
     fig = plt.figure()
     plt.title('BA - median projection error vs distance from last frame')
     plt.plot(distances, median_proj_err_left, label='left')
@@ -149,6 +153,8 @@ def BA_median_projection_error_per_distance():
 
     fig.savefig(f'{OUTPUT_DIR}BA_median_projection_error_vs_distance_from_last_frame.png')
     plt.close(fig)
+
+    return distances, links_num_per_distance
 
     # distances, median_proj_err_left, median_proj_err_right = bundle_adjustment.get_median_projection_error_per_distance()
     # fig = go.Figure()
@@ -205,20 +211,31 @@ def plot_uncertainty(cov_list_before, cov_list_after, keyframes, title):
     det_cov_before = np.array(det_cov_before)
     det_cov_after = np.array(det_cov_after)
 
-    fig = plt.figure()
-    plt.title(f"{title} uncertainty before and after Loop Closure")
-    plt.plot(keyframes, det_cov_before, label="Before")
-    plt.plot(keyframes, det_cov_after, label="After")
-    plt.yscale('log')
-    plt.ylabel("uncertainty -sqrt covariance determinate (log scale)")
+    fig, ax = plt.subplots()
+    ax.plot(keyframes, det_cov_before, label='Before')
+    ax.plot(keyframes, det_cov_after, label='After')
+    ax.legend()
+    ax.set_title(f"{title} uncertainty before and after Loop Closure")
     plt.xlabel("Keyframe")
-    plt.legend()
+    plt.ylabel("uncertainty -sqrt covariance determinate (log scale)")
+    plt.yscale('log')
+    ax.get_yaxis().set_visible(False)
+    plt.savefig(f'{OUTPUT_DIR}{title}_uncertainty_before_after_loop_closure.png')
 
-    ax = plt.gca()
-    ax.set_yticklabels([])
-
-    fig.savefig(f'{OUTPUT_DIR}{title}_uncertainty_before_after_loop_closure.png')
-    plt.close(fig)
+    # fig = plt.figure()
+    # plt.title(f"{title} uncertainty before and after Loop Closure")
+    # plt.plot(keyframes, det_cov_before, label="Before")
+    # plt.plot(keyframes, det_cov_after, label="After")
+    # plt.yscale('log')
+    # plt.ylabel("uncertainty -sqrt covariance determinate (log scale)")
+    # plt.xlabel("Keyframe")
+    # plt.legend()
+    #
+    # ax = plt.gca()
+    # ax.set_yticklabels([])
+    #
+    # fig.savefig(f'{OUTPUT_DIR}{title}_uncertainty_before_after_loop_closure.png')
+    # plt.close(fig)
 
 
 def slice_cov_mat_to_localization_angle(cov_list):
@@ -276,8 +293,11 @@ def relative_estimation_error_in_sequences(estimation_mats, gt_mats, gt_location
 def plot_relative_estimation_error_in_sequences(title_model, title_error_type, list_seq_len, list_errors, list_sequences_list):
     fig = plt.figure()
     plt.title(f"Relative {title_model} estimation {title_error_type} error with sequences of")
+    avg = 0
     for i, seq_len in enumerate(list_seq_len):
         plt.plot(list_sequences_list[i], list_errors[i], label=str(seq_len))
+        avg += np.average(list_errors[i])
+    avg = avg / len(list_seq_len)
     if title_error_type == 'location':
         plt.ylabel("error (m/m)")
     else:
@@ -289,6 +309,22 @@ def plot_relative_estimation_error_in_sequences(title_model, title_error_type, l
     plt.legend()
     fig.savefig(f'{OUTPUT_DIR}{title_model}_{title_error_type}_relative_estimation_error_in_seq.png')
     plt.close(fig)
+    print(f"Relative {title_model} estimation error - Avarege {title_error_type} error of all the sequences: {avg}")
+
+
+def plot_links_num_per_distance(pnp_distances, pnp_links_num_per_distance, ba_distances, ba_links_num_per_distance):
+    fig = plt.figure()
+    plt.title('Links Number Per Distance From Last Frame - PnP vs BA')
+    plt.plot(pnp_distances, pnp_links_num_per_distance, label='PnP')
+    plt.plot(ba_distances, ba_links_num_per_distance, label='BA')
+    plt.ylabel('Links Num')
+    plt.xlabel('distance from last frame')
+    plt.legend()
+    plt.yscale('log')
+
+    fig.savefig(f'{OUTPUT_DIR}links_num_per_distance.png')
+    plt.close(fig)
+
 
 
 if __name__ == '__main__':
@@ -347,9 +383,11 @@ if __name__ == '__main__':
         (keyframes_list, median_projection_error_before, median_projection_error_after,
          'median projection error')
 
-    PnP_median_projection_error_per_distance()  # distance from last frame of track were we computed triangulation
+    pnp_distances, pnp_links_num_per_distance = PnP_median_projection_error_per_distance()  # distance from last frame of track were we computed triangulation
 
-    BA_median_projection_error_per_distance()  # distance from last frame of min(track, window) were we computed triangulation
+    ba_distances, ba_links_num_per_distance = BA_median_projection_error_per_distance()  # distance from last frame of min(track, window) were we computed triangulation
+
+    plot_links_num_per_distance(pnp_distances, pnp_links_num_per_distance, ba_distances, ba_links_num_per_distance)
 
     ground_truth_mats_of_keyframes = ground_truth_mats[keyframes_list]
     ground_truth_locations_of_keyframes = ground_truth_locations[keyframes_list]

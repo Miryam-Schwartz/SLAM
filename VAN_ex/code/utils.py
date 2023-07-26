@@ -6,10 +6,17 @@ import plotly.express as px
 import plotly.graph_objs as go
 from matplotlib import pyplot as plt
 
+# current year data
 DATA_PATH = r'/mnt/c/Users/Miryam/SLAM/VAN_ex/dataset/sequences/05/'
 DB_PATH = r'/mnt/c/Users/Miryam/SLAM/VAN_ex/code/DB/'
 GROUND_TRUTH_PATH = '/mnt/c/Users/Miryam/SLAM/VAN_ex/dataset/poses/05.txt'
 FRAMES_NUM = 2560
+
+# last year data
+# DATA_PATH = r'/mnt/c/Users/Miryam/SLAM/VAN_ex/dataset_last_year/sequences/00/'
+# DB_PATH = r'/mnt/c/Users/Miryam/SLAM/VAN_ex/code/DB_last_year/'
+# GROUND_TRUTH_PATH = '/mnt/c/Users/Miryam/SLAM/VAN_ex/dataset_last_year/poses/00.txt'
+# FRAMES_NUM = 3450
 
 
 def read_images(idx):

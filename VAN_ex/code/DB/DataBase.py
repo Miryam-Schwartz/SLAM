@@ -257,10 +257,11 @@ class DataBase:
         p, eps = 0.99, 0.99  # eps = prob to be outlier
         i = 0
         size = len(matches)
+        print("matches number between frames: ", size)
         max_supporters_num = 0
         idxs_max_supports_matches = None
         while eps > 0 and i < utils.calc_max_iterations(p, eps, 4):
-            points_2d, points_3d = self._sample_4_points(first_frame_id, second_frame_id, matches)
+            points_2d, points_3d = self._sample_4_points_with_filter(first_frame_id, second_frame_id, matches)
             extrinsic_camera_mat_second_frame_left, extrinsic_camera_mat_second_frame_right = \
                 utils.estimate_second_frame_mats_pnp(points_2d, points_3d, Frame.INDENTATION_RIGHT_CAM_MAT, Frame.k)
             if extrinsic_camera_mat_second_frame_left is None:
@@ -292,6 +293,7 @@ class DataBase:
                                                           extrinsic_camera_mat_second_frame_right)
         matches = np.array(matches)
         idxs_max_supports_matches = np.array(idxs_max_supports_matches)
+        print("supporters num ", idxs_max_supports_matches.shape[0])
         return extrinsic_camera_mat_second_frame_left, matches[idxs_max_supports_matches], \
             (len(idxs_max_supports_matches) / len(matches)) * 100
 
@@ -304,6 +306,26 @@ class DataBase:
             points_3d[i] = self._frames_dict[first_frame_id].get_3d_point(cur_match[0])
             pixel_left, pixel_right = self._frames_dict[second_frame_id].get_feature_pixels(cur_match[1])
             points_2d[i] = np.array(pixel_left)
+        return points_2d, points_3d
+
+    def _sample_4_points_with_filter(self, first_frame_id, second_frame_id, matches):
+        rand_idxs = set()
+        points_3d = np.empty((4, 3))
+        points_2d = np.empty((4, 2))
+        i = 0
+        while i < 4:
+            rand_idx = random.randint(0, len(matches)-1)
+            if rand_idx in rand_idxs:
+                continue
+            rand_idxs.add(rand_idx)
+            cur_match = matches[rand_idx]  # kp_idx of first frame, kp_idx of second frame
+            point_3d = self._frames_dict[first_frame_id].get_3d_point(cur_match[0])
+            if point_3d[2] > 200 or point_3d[2] <= 0:
+                continue
+            points_3d[i] = point_3d
+            pixel_left, pixel_right = self._frames_dict[second_frame_id].get_feature_pixels(cur_match[1])
+            points_2d[i] = np.array(pixel_left)
+            i += 1
         return points_2d, points_3d
 
     def _find_supporters(self, first_frame_id, second_frame_id, matches, extrinsic_camera_mat_second_frame_left,

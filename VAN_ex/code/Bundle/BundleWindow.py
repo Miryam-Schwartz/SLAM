@@ -267,7 +267,6 @@ class BundleWindow:
                 pt_2d_proj = stereo_cam.project(pt_3d)
                 diff = pt_2d_real - pt_2d_proj
                 diff = np.array([diff.uL(), diff.uR(), diff.v()])
-                first_frame = max(self._first_keyframe_id, track_obj.get_first_frame_id())
                 d = last_frame_id - frame_id
                 if d in projection_error_left:
                     projection_error_left[d].append(np.linalg.norm(diff[[0, 2]]))
