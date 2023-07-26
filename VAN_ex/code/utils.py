@@ -9,6 +9,7 @@ from matplotlib import pyplot as plt
 DATA_PATH = r'/mnt/c/Users/Miryam/SLAM/VAN_ex/dataset/sequences/05/'
 DB_PATH = r'/mnt/c/Users/Miryam/SLAM/VAN_ex/code/DB/'
 GROUND_TRUTH_PATH = '/mnt/c/Users/Miryam/SLAM/VAN_ex/dataset/poses/05.txt'
+FRAMES_NUM = 2560
 
 
 def read_images(idx):

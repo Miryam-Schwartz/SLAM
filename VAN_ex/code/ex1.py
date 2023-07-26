@@ -133,4 +133,5 @@ def ex1_run():
     draw_matches_signi_test(img1, img2, kp1, kp2, fail_matches, OUTPUT_DIR + 'fail_matches.png')
 
 
-ex1_run()
+if __name__ == '__main__':
+    ex1_run()

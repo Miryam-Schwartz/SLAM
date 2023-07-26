@@ -16,6 +16,10 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 WINDOW_LEN = 20
 
 def create_intrinsic_mat():
+    """
+    read intrinsic matrix from a file and create gtsam object of it
+    :return: gtsam object that represents the intrinsic camera matrix of
+    """
     k, _, m_right = utils.read_cameras()
     indentation_right_cam = m_right[0][3]
     K = gtsam.Cal3_S2Stereo(k[0][0], k[1][1], k[0][1], k[0][2], k[1][2], -indentation_right_cam)
@@ -23,6 +27,11 @@ def create_intrinsic_mat():
 
 
 def reprojection_and_factor_error(db):
+    """
+    Calculate and plot graphs of reprojection error, factor error and reprojection error as a function of factor error,
+    All the error are evaluated from a random track
+    :param db:
+    """
     track = db.get_random_track_in_len(10)
     frames_cameras, real_pts_2d = create_frames_cameras_and_pixels_from_track(db, track)
 
@@ -120,9 +129,7 @@ def q5_2(db):
 def q5_3(db):
     ground_truth_matrices = utils.read_ground_truth_matrices()
     ground_truth_locations = utils.calculate_ground_truth_locations_from_matrices(ground_truth_matrices)
-    # mean_track_len, max_track_len, min_track_len = db.get_mean_max_and_min_track_len()
-    # median_track_len = db.get_median_track_len()
-    alg = BundleAdjustment(2560, WINDOW_LEN, db)
+    alg = BundleAdjustment(utils.FRAMES_NUM, WINDOW_LEN, db)
     alg.optimize_all_windows()
     last_window = alg.get_last_window()
     print("Final position of first frame of last window: ",
@@ -222,13 +229,14 @@ def run_ex5():
     # 5.1
     reprojection_and_factor_error(db)
 
-    # 5.2
+    # 5.2 bundle adjustment window
     q5_2(db)
 
-    # 5.3
+    # 5.3 convert to world coordinates, plot the localization and the error
     q5_3(db)
 
     return 0
 
 
-run_ex5()
+if __name__ == '__main__':
+    run_ex5()

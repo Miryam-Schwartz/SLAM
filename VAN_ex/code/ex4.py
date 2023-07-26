@@ -119,8 +119,13 @@ def tracks_length_histogram(db):
 
 
 def reprojection_error(db):
+    """ Present a graph of the reprojection error size (L2 norm) over random track images.
+    We’ll define the reprojection error for a given camera as the difference between the projection
+    and the tracked feature location on that camera.
+    :param db:
+    """
     track = db.get_random_track_in_len(10)
-    ground_truth_matrices = utils.read_ground_truth_matrices("C:\\Users\\Miryam\\SLAM\\VAN_ex\\dataset\\poses\\05.txt")
+    ground_truth_matrices = utils.read_ground_truth_matrices(utils.GROUND_TRUTH_PATH)
     last_frame_id, kp_idx = track.get_last_frame_id_and_kp_idx()
     pt_3d = db.get_frame_obj(last_frame_id).get_3d_point(kp_idx)  # in coordinates of last frame
     mat = ground_truth_matrices[last_frame_id]
@@ -148,25 +153,18 @@ def reprojection_error(db):
 
     fig = go.Figure()
     fig.add_trace(
-        go.Scatter(x=frames_arr, y=reprojection_error_left, mode='lines+markers', name='Left error'
-                   # title=f"Reprojection error size (L2 norm) over track {track.get_id()} images",
-                   # labels={'x': 'Frame', 'y': 'Reprojection error'})
-                   ))
+        go.Scatter(x=frames_arr, y=reprojection_error_left, mode='lines+markers', name='Left error'))
     fig.add_trace(
-        go.Scatter(x=frames_arr, y=reprojection_error_right, mode='lines+markers', name='Right error'
-                   # title=f"Reprojection error size (L2 norm) over track {track.get_id()} images",
-                   # labels={'x': 'Frame', 'y': 'Reprojection error'})
-                   ))
+        go.Scatter(x=frames_arr, y=reprojection_error_right, mode='lines+markers', name='Right error'))
     fig.update_layout(title=f"Reprojection error size (L2 norm) over track {track.get_id()} images",
                       xaxis_title='Frame id', yaxis_title='Reprojection error')
     fig.write_image(f"{OUTPUT_DIR}reprojection_error.png")
 
 
 def ex4_run():
-
     # 4.1 Create, fill and serialize the database from the frames images while removing outliers
     db = DataBase()
-    db.fill_database(2560)
+    db.fill_database(utils.FRAMES_NUM)
     db.save_database('C:\\Users\\Miryam\\SLAM\\VAN_ex\\code\\DB\\')
 
     # 4.2 Present tracking statistics
@@ -200,6 +198,7 @@ def ex4_run():
     utils.show_localization(locations, ground_truth_locations, f'{OUTPUT_DIR}localization.png')
 
     return 0
+
 
 if __name__ == '__main__':
     ex4_run()

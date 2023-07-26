@@ -14,6 +14,12 @@ K = None
 
 
 def project_3d_pt_to_pixel(extrinsic_camera_mat, pt_3d):
+    """
+    This function projects a 3d point to a 2d pixel on an image
+    :param extrinsic_camera_mat: np array with shape (3,4), represents extrinsic camera matrix
+    :param pt_3d: np array with shape (3,1), represents 3d point in the world
+    :return: np array with shape (2,1), represents a projected pixel in the image
+    """
     pt_3d_h = np.append(pt_3d, [1])
     projected = K @ extrinsic_camera_mat @ pt_3d_h
     return projected[0:2] / projected[2]
@@ -155,15 +161,17 @@ def read_matrices(path):
 
 def ex3_run():
     # 3.1
-    img0_left, img0_right, kp0_left, des0_left, kp0_right, des0_right, points_cloud_0, dict_matches0 = utils.match_and_triangulate_image(0)
-    img1_left, img1_right, kp1_left, des1_left, kp1_right, des1_right, points_cloud_1, dict_matches1 = utils.match_and_triangulate_image(1)
+    img0_left, img0_right, kp0_left, des0_left, kp0_right, des0_right, points_cloud_0, dict_matches0 = utils.match_and_triangulate_image(
+        0)
+    img1_left, img1_right, kp1_left, des1_left, kp1_right, des1_right, points_cloud_1, dict_matches1 = utils.match_and_triangulate_image(
+        1)
 
     # 3.2
     matches_0_1_left = utils.find_matches(np.array(des0_left), np.array(des1_left))
 
     # 3.3
     random.seed(4)
-    kp0_left_l, des0_left_l, kp1_left_l, des1_left_l, dict_matches0_1_left =\
+    kp0_left_l, des0_left_l, kp1_left_l, des1_left_l, dict_matches0_1_left = \
         utils.get_correlated_kps_and_des_from_matches(kp0_left, des0_left, kp1_left, des1_left, matches_0_1_left)
     points_2d, points_3d = sample_4_points(kp0_left_l, kp1_left_l, points_cloud_0)
     global K
@@ -176,8 +184,9 @@ def ex3_run():
 
     # 3.4
     # we used the points_cloud_0 because there, the 3d points are aligned to the global coordinate
-    supporter_left0, supporter_left1, unsupporter_left0, unsupporter_left1 =\
-        find_supporters(kp0_left_l, kp1_left_l, points_cloud_0, extrinsic_camera_mat_left1, extrinsic_camera_mat_right1, dict_matches1, is_find_unsupported=True)
+    supporter_left0, supporter_left1, unsupporter_left0, unsupporter_left1 = \
+        find_supporters(kp0_left_l, kp1_left_l, points_cloud_0, extrinsic_camera_mat_left1, extrinsic_camera_mat_right1,
+                        dict_matches1, is_find_unsupported=True)
 
     plot_supporters_and_unsupporters_on_img(img0_left, supporter_left0, unsupporter_left0, 'img0_left_supporters.png')
     plot_supporters_and_unsupporters_on_img(img1_left, supporter_left1, unsupporter_left1, 'img1_left_supporters.png')
@@ -271,4 +280,5 @@ def plot_cameras_positions(extrinsic_camera_mat_left1, extrinsic_camera_mat_righ
     fig.write_html(f'{OUTPUT_DIR}cameras_pos.html')
 
 
-ex3_run()
+if __name__ == '__main__':
+    ex3_run()

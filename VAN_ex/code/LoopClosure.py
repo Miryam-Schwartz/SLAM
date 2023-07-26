@@ -67,7 +67,7 @@ class LoopClosure:
             extract_matches(outliers_matches, kp_left_first, kp_right_first, kp_left_second, kp_right_second)
         return extrinsic_camera_mat_second_frame_left, inliers_i, inliers_n, outliers_i, outliers_n
 
-    def find_loops(self, output_dir):
+    def find_loops(self, output_dir, plot=True):
         loops_dict = dict()
         keyframes_list = self._pose_graph.get_keyframes()
         interval_len = int(len(keyframes_list) / 6)
@@ -87,7 +87,7 @@ class LoopClosure:
                     # 7.4
                     self._pose_graph.add_factor(i_keyframe, n_keyframe, pose_i_to_n, cov_i_to_n)
                     self._pose_graph.optimize()
-            if j % interval_len == 0:
+            if j % interval_len == 0 and plot:
                 self._pose_graph.show(f"{output_dir}pose_graph_after_keyframe_{n_keyframe}.png", n_keyframe)
         return loops_dict
 

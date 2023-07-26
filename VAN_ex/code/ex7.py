@@ -81,7 +81,7 @@ if __name__ == '__main__':
     db = DataBase()
     db.read_database(utils.DB_PATH)
     print("finished read data")
-    bundle_adjustment = BundleAdjustment(2560, 20, db)
+    bundle_adjustment = BundleAdjustment(utils.FRAMES_NUM, 20, db)
     bundle_adjustment.optimize_all_windows()
     print("finished bundle adjustment")
     pose_graph = PoseGraph(bundle_adjustment)

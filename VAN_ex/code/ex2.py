@@ -247,4 +247,5 @@ def ex2_run():
     show_dots_3d_cloud(dots_3d_clean, f"{OUTPUT_DIR}our_3D_points_cloud_img{0}_clean.html")
 
 
-ex2_run()
+if __name__ == '__main__':
+    ex2_run()

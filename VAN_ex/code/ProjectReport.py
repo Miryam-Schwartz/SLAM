@@ -51,6 +51,7 @@ def show_locations_trajectory(ground_truth_locations, pnp_locations, bundle_adju
     ax.scatter(x=loop_closure_locations[:, 0], y=loop_closure_locations[:, 2],
                label='Loop Closure', s=30, alpha=0.7, c='tab:red')
     ax.legend(fontsize='20')
+    ax.set_title('Loclization Trajectory - bird eye view')
     plt.xlabel('x')
     plt.ylabel('z')
     plt.savefig(f'{OUTPUT_DIR}localization.png')
@@ -62,7 +63,7 @@ def plot_bundle_error_before_after_opt(keyframes_list, mean_factor_error_before,
         go.Scatter(x=keyframes_list, y=mean_factor_error_before, mode='lines', name='Before'))
     fig.add_trace(
         go.Scatter(x=keyframes_list, y=mean_factor_error_after, mode='lines', name='After'))
-    fig.update_layout(title=title, xaxis_title='Keyframe id', yaxis_title=title)
+    fig.update_layout(title=f'{title} before and after BA optimization', xaxis_title='Keyframe id', yaxis_title=title)
     fig.write_image(f'{OUTPUT_DIR}{title}.png')
 
 
@@ -100,7 +101,7 @@ def PnP_median_projection_error_per_distance():
                 left_projection_err[distance] = [left_err]
                 right_projection_err[distance] = [right_err]
 
-    distances = np.array(list(right_projection_err.keys()))
+    distances = np.array(sorted(right_projection_err.keys()))
     median_proj_err_left = np.array([statistics.median(left_projection_err[d]) for d in distances])
     median_proj_err_right = np.array([statistics.median(right_projection_err[d]) for d in distances])
 
@@ -209,9 +210,12 @@ def plot_uncertainty(cov_list_before, cov_list_after, keyframes, title):
     plt.plot(keyframes, det_cov_before, label="Before")
     plt.plot(keyframes, det_cov_after, label="After")
     plt.yscale('log')
-    plt.ylabel("uncertainty -sqrt covariance determinate")
+    plt.ylabel("uncertainty -sqrt covariance determinate (log scale)")
     plt.xlabel("Keyframe")
     plt.legend()
+
+    ax = plt.gca()
+    ax.set_yticklabels([])
 
     fig.savefig(f'{OUTPUT_DIR}{title}_uncertainty_before_after_loop_closure.png')
     plt.close(fig)
@@ -297,7 +301,7 @@ if __name__ == '__main__':
     pnp_locations = utils.calculate_ground_truth_locations_from_matrices(pnp_mats)
     print("finished read data")
 
-    bundle_adjustment = BundleAdjustment(2560, 20, db)
+    bundle_adjustment = BundleAdjustment(utils.FRAMES_NUM, 20, db)
     keyframes_list = bundle_adjustment.get_keyframes()
     mean_factor_error_before = bundle_adjustment.get_mean_factor_error_for_all_windows()
     median_projection_error_before = bundle_adjustment.get_median_projection_error_for_all_windows()
@@ -317,7 +321,7 @@ if __name__ == '__main__':
     loop_closure = LoopClosure(db, pose_graph, threshold_close=500,
                                threshold_inliers_rel=0.4)
     full_cov_before_LC = np.array(pose_graph.get_covraince_all_poses())
-    loops_dict = loop_closure.find_loops(OUTPUT_DIR)
+    loops_dict = loop_closure.find_loops(OUTPUT_DIR, plot=False)
     full_cov_after_LC = np.array(pose_graph.get_covraince_all_poses())
     loop_closure_poses = pose_graph.get_global_keyframes_poses()  # dict
     loop_closure_mats = from_gtsam_poses_to_world_coordinates_mats(loop_closure_poses)
@@ -336,12 +340,12 @@ if __name__ == '__main__':
     # mean factor error for each window
     plot_bundle_error_before_after_opt \
         (keyframes_list, mean_factor_error_before, mean_factor_error_after,
-         'mean factor error before and after BA optimization')
+         'mean factor error')
 
     # median projection error for each window
     plot_bundle_error_before_after_opt \
         (keyframes_list, median_projection_error_before, median_projection_error_after,
-         'median projection error before and after BA optimization')
+         'median projection error')
 
     PnP_median_projection_error_per_distance()  # distance from last frame of track were we computed triangulation
 
@@ -390,4 +394,4 @@ if __name__ == '__main__':
         ba_errors_angle.append(angle_errors)
         ba_sequences_list.append(sequences)
     plot_relative_estimation_error_in_sequences('BA', 'location', [100, 300, 800], ba_errors_location, ba_sequences_list)
-    plot_relative_estimation_error_in_sequences('PnP', 'angle', [100, 300, 800], ba_errors_angle, ba_sequences_list)
+    plot_relative_estimation_error_in_sequences('BA', 'angle', [100, 300, 800], ba_errors_angle, ba_sequences_list)

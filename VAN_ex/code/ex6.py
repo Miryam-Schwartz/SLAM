@@ -15,7 +15,7 @@ def ex6_run():
     db = DataBase()
     db.read_database(utils.DB_PATH)
 
-    bundle_adjustment = BundleAdjustment(2560, 20, db)
+    bundle_adjustment = BundleAdjustment(utils.FRAMES_NUM, 20, db)
     bundle_adjustment.optimize_all_windows()
 
     q6_1(bundle_adjustment)
