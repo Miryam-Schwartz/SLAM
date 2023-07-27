@@ -1,9 +1,7 @@
 import statistics
-
 import gtsam
 import numpy as np
 
-# from BundleWindow import BundleWindow
 from VAN_ex.code.Bundle.BundleWindow import BundleWindow
 
 
@@ -12,7 +10,10 @@ class BundleAdjustment:
         self._window_len = window_len
         self._frames_num = frames_num
         self._db = db
-        self._bundle_windows = self._init_bundle_windows()  # key = first keyframe, val = window obj
+        if window_len != 0:
+            self._bundle_windows = self._init_bundle_windows()  # key = first keyframe, val = window obj
+        else:
+            self._bundle_windows = self._init_bundle_windows_by_median_track_len()
 
     @staticmethod
     def from_poses_to_locations(poses):
@@ -27,6 +28,19 @@ class BundleAdjustment:
         for first_keyframe in range(0, self._frames_num, self._window_len-1):
             last_key_frame = min(first_keyframe + self._window_len - 1, self._frames_num - 1)
             bundle_windows[first_keyframe] = BundleWindow(self._db, first_keyframe, last_key_frame)
+        return bundle_windows
+
+    def _init_bundle_windows_by_median_track_len(self):
+        bundle_windows = dict()
+        first_keyframe = 0
+        last_keyframe = int(self._get_median_track_len_from_frame(first_keyframe))
+        while last_keyframe < self._frames_num - 1:
+            bundle_windows[first_keyframe] = BundleWindow(self._db, first_keyframe, last_keyframe)
+            first_keyframe = last_keyframe
+            last_keyframe = int(self._get_median_track_len_from_frame(first_keyframe))
+
+        last_keyframe = min(last_keyframe, self._frames_num - 1)
+        bundle_windows[first_keyframe] = BundleWindow(self._db, first_keyframe, last_keyframe)
         return bundle_windows
 
     def get_keyframes(self):
@@ -99,6 +113,15 @@ class BundleAdjustment:
 
     def get_window_len(self):
         return self._window_len
+
+    def _get_median_track_len_from_frame(self, frame_id):
+        frame_obj = self._db.get_frame_obj(frame_id)
+        track_lens = frame_obj.get_lens_outgoing_tracks()
+        return statistics.median(track_lens)
+
+
+
+
 
 
 
