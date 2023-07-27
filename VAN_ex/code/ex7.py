@@ -1,5 +1,4 @@
 import os
-
 import numpy as np
 from matplotlib import pyplot as plt
 
@@ -80,17 +79,15 @@ def plot_location_uncertainty(cov_list_before, cov_list_after, keyframes):
 if __name__ == '__main__':
     db = DataBase()
     db.read_database(utils.DB_PATH)
-    print("finished read data")
+
     bundle_adjustment = BundleAdjustment(utils.FRAMES_NUM, 20, db)
     bundle_adjustment.optimize_all_windows()
-    print("finished bundle adjustment")
+
     pose_graph = PoseGraph(bundle_adjustment)
     global_poses = pose_graph.get_global_keyframes_poses()
     global_locations = BundleAdjustment.from_poses_to_locations(global_poses)
 
-    print("starting loop closure")
-    loop_closure = LoopClosure(db, pose_graph, threshold_close=500,
-                               threshold_inliers_rel=0.4)
+    loop_closure = LoopClosure(db, pose_graph, threshold_close=500, threshold_inliers_rel=0.4)
     cov_list_before = pose_graph.get_covraince_all_poses()
     loops_dict = loop_closure.find_loops(OUTPUT_DIR)
     cov_list_after = pose_graph.get_covraince_all_poses()

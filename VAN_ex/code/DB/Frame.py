@@ -94,6 +94,14 @@ class Frame:
                 counter += 1
         return counter
 
+    def get_lens_outgoing_tracks(self):
+        lens_outgoing_tracks = []
+        for track in self._tracks_dict.values():
+            if self._frame_id + 1 in track.get_frames_dict():
+                last_frame_id, _ = track.get_last_frame_id_and_kp_idx()
+                lens_outgoing_tracks.append(last_frame_id - self._frame_id)
+        return lens_outgoing_tracks
+
     # def get_left_camera_location(self):
     #     if self._left_camera_location is None:
     #         raise "location is None"

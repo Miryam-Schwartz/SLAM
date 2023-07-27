@@ -181,24 +181,6 @@ def keyframes_localization_error(alg, global_locations, ground_truth_locations, 
 
 
 def show_localization_after_optimization(global_3d_points, global_locations, ground_truth_locations, initial_estimate):
-    # fig = go.Figure()
-    # fig.add_trace(
-    #     go.Scatter(x=global_locations[:, 0], y=global_locations[:, 2],
-    #                mode='lines+markers', name='Keyframes positions'))
-    # fig.add_trace(
-    #     go.Scatter(x=global_3d_points[:, 0], y=global_3d_points[:, 2],
-    #                mode='markers', name='Points', marker=dict(size=3)))
-    # fig.add_trace(
-    #     go.Scatter(x=ground_truth_locations[:, 0], y=ground_truth_locations[:, 2],
-    #                mode='lines+markers', name='Ground Truth Locations'))
-    # fig.add_trace(
-    #     go.Scatter(x=initial_estimate[:, 0], y=initial_estimate[:, 2],
-    #                mode='lines+markers', name='Initial estimate'))
-    #
-    # fig.update_layout(title='Cameras & Points - View from above',
-    #                   xaxis_title='x', yaxis_title='z')
-    # fig.write_image(f'{OUTPUT_DIR}Key frames after optimization.png')
-
     fig, ax = plt.subplots(figsize=(12.8, 9.6))
     ax.scatter(x=global_locations[:, 0], y=global_locations[:, 2],
                c='tab:blue', label='Keyframes positions', s=3, alpha=1, linestyle='-', marker='o')
@@ -210,11 +192,9 @@ def show_localization_after_optimization(global_3d_points, global_locations, gro
     ax.scatter(x=initial_estimate[:, 0], y=initial_estimate[:, 2],
                c='tab:purple', label='Initial estimate', s=0.5, alpha=0.7)
 
-
     ax.set_ylim(-200, 200)
     ax.set_xlim(-300, 300)
     ax.legend()
-
 
     plt.title('Cameras & Points - View from above')
     plt.xlabel('x')

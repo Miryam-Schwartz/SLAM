@@ -23,7 +23,32 @@ def ex6_run():
     q6_2(bundle_adjustment)
 
 
+def q6_1(bundle_adjustment):
+    """
+    Extract relative pose constraint from Bundle optimization
+    :param bundle_adjustment:
+    """
+    first_window = bundle_adjustment.get_first_window()
+    marginals = first_window.get_marginals()
+    result = first_window.get_current_values()
+    plot.plot_trajectory(0, result, marginals=marginals, scale=1, title="Covariance poses for first bundle",
+                         save_file=f"{OUTPUT_DIR}Poses rel_covs.png", d2_view=False)
+    first_camera = first_window.get_frame_pose3(first_window.get_first_keyframe_id())
+    second_camera = first_window.get_frame_pose3(first_window.get_last_keyframe_id())
+    relative_pose = first_camera.between(second_camera)
+    print("Relative pose between first two keyframes:")
+    print(first_window.get_frame_pose3(first_window.get_last_keyframe_id()))
+    print("relative pose - with between method")
+    print(relative_pose)
+    print("Covariance:")
+    print(first_window.get_covariance())
+
+
 def q6_2(bundle_adjustment):
+    """
+    Pose Graph
+    :param bundle_adjustment:
+    """
     pose_graph = PoseGraph(bundle_adjustment)
     global_poses = pose_graph.get_global_keyframes_poses()
     locations = BundleAdjustment.from_poses_to_locations(global_poses)
@@ -41,28 +66,7 @@ def q6_2(bundle_adjustment):
     marginals = pose_graph.get_marginals()
     result = pose_graph.get_current_values()
     plot.plot_trajectory(0, result, marginals=marginals, scale=1, title="Locations with marginal covariance",
-                         save_file=f"{OUTPUT_DIR}locatization with covariance.png"
-                         , d2_view=True
-                         )
-
-
-def q6_1(bundle_adjustment):
-    first_window = bundle_adjustment.get_first_window()
-    marginals = first_window.get_marginals()
-    result = first_window.get_current_values()
-    plot.plot_trajectory(0, result, marginals=marginals, scale=1, title="Covariance poses for first bundle",
-                         save_file=f"{OUTPUT_DIR}Poses rel_covs.png"
-                         , d2_view=False
-                         )
-    first_camera = first_window.get_frame_pose3(first_window.get_first_keyframe_id())
-    second_camera = first_window.get_frame_pose3(first_window.get_last_keyframe_id())
-    relative_pose = first_camera.between(second_camera)
-    print("Relative pose between first two keyframes:")
-    print(first_window.get_frame_pose3(first_window.get_last_keyframe_id()))
-    print("relative pose - with between method")
-    print(relative_pose)
-    print("Covariance:")
-    print(first_window.get_covariance())
+                         save_file=f"{OUTPUT_DIR}locatization with covariance.png", d2_view=True)
 
 
 if __name__ == '__main__':

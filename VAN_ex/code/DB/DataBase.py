@@ -12,7 +12,6 @@ from VAN_ex.code.DB.Track import Track
 class DataBase:
     """
         A class used to represent a DataBase that holds within all the data of tracking
-
         ...
 
         Attributes
@@ -121,6 +120,9 @@ class DataBase:
         return locations
 
     def get_left_camera_mats_in_world_coordinates(self):
+        """
+        :return: np array include all camera matrices, calculated in global coordinates
+        """
         concat_r, concat_t = np.identity(3), np.zeros(3)
         mats = []
         for frame_id, frame_obj in self._frames_dict.items():
@@ -157,6 +159,9 @@ class DataBase:
         return sum_tracks / self.get_frames_number()
 
     def get_median_track_len(self):
+        """
+        :return: Median track len over all the tracks
+        """
         lengths = np.empty(len(self._tracks_dict))
         for i, track in enumerate(self._tracks_dict.values()):
             track_len = track.get_track_len()
@@ -172,6 +177,13 @@ class DataBase:
     # ================ Tracking ================ #
 
     def fill_database(self, frame_number):
+        """
+        Read images from dataset, find matches, make triangulation, and calculate the motion between each frame to the
+        next frame. Assume that after calling to this function, the database will be filled with all the details
+        (frames, tracks and such as this). To calculate the relative motion between each frame to the next,
+        we use RANSAC with PnP.
+        :param frame_number: The calculation will be from frame number 0, till this frame
+        """
         k, m_left, m_right = utils.read_cameras()
         self.set_initial_camera(k, m_left, m_right)
         for i in range(frame_number):
@@ -183,6 +195,14 @@ class DataBase:
 
     @staticmethod
     def _match_in_frame(im_idx, threshold=1):
+        """
+        Read frame images, find KeyPoints on both images, find matches between them, and use rectified stereo pattern to
+        reject not suitable matches
+        :param im_idx: index of frame to find matches on it
+        :param threshold: rectified stereo pattern threshold, i.e. by how many pixels the keypoints in a match can be
+        far from each other.
+        :return: np arrays of: left_key-points, left_descriptors, right_key-points, right_descriptors
+        """
         left_img, right_img = utils.read_images(im_idx)
         left_kp, left_des, right_kp, right_des = utils.detect_and_compute(left_img, right_img)
         matches = utils.find_matches(left_des, right_des)
@@ -257,11 +277,11 @@ class DataBase:
         p, eps = 0.99, 0.99  # eps = prob to be outlier
         i = 0
         size = len(matches)
-        print("matches number between frames: ", size)
+        # print("matches number between frames: ", size)
         max_supporters_num = 0
         idxs_max_supports_matches = None
         while eps > 0 and i < utils.calc_max_iterations(p, eps, 4):
-            points_2d, points_3d = self._sample_4_points_with_filter(first_frame_id, second_frame_id, matches)
+            points_2d, points_3d = self._sample_4_points(first_frame_id, second_frame_id, matches)
             extrinsic_camera_mat_second_frame_left, extrinsic_camera_mat_second_frame_right = \
                 utils.estimate_second_frame_mats_pnp(points_2d, points_3d, Frame.INDENTATION_RIGHT_CAM_MAT, Frame.k)
             if extrinsic_camera_mat_second_frame_left is None:
@@ -270,6 +290,8 @@ class DataBase:
                                                                extrinsic_camera_mat_second_frame_left,
                                                                extrinsic_camera_mat_second_frame_right)
             supporters_num = len(idxs_of_supporters_matches)
+            if first_frame_id == 2387:
+                print("supporters num ", supporters_num)
             if supporters_num > max_supporters_num:
                 max_supporters_num = supporters_num
                 idxs_max_supports_matches = idxs_of_supporters_matches
@@ -293,7 +315,7 @@ class DataBase:
                                                           extrinsic_camera_mat_second_frame_right)
         matches = np.array(matches)
         idxs_max_supports_matches = np.array(idxs_max_supports_matches)
-        print("supporters num ", idxs_max_supports_matches.shape[0])
+        # print("supporters num ", idxs_max_supports_matches.shape[0])
         return extrinsic_camera_mat_second_frame_left, matches[idxs_max_supports_matches], \
             (len(idxs_max_supports_matches) / len(matches)) * 100
 
@@ -330,6 +352,19 @@ class DataBase:
 
     def _find_supporters(self, first_frame_id, second_frame_id, matches, extrinsic_camera_mat_second_frame_left,
                          extrinsic_camera_mat_second_frame_right):
+        """
+        Given extrinsic camera matrices of a frame (right and left mats), and matches, return indexes of all the
+        matches that are supporters. means, the distance from the pixel to the projected pixel
+        (after making triangulation and finding the 3d point), is not bigger than a threshold.
+        :param first_frame_id: id of first frame
+        :param second_frame_id: id of second frame
+        :param matches: list of matches between key-points in first frame, to key-points in second frame. each match is
+        a tuple: (idx of kp in first frame, idx of kp in second frame)
+        :param extrinsic_camera_mat_second_frame_left: second frame extrinsic left camera matrix, represents the relative
+        motion from first to second frame.
+        :param extrinsic_camera_mat_second_frame_right: second frame extrinsic right camera matrix
+        :return: indices of all matches from matches list that are supporters
+        """
         idxs_supports_matches = []
         for i in range(len(matches)):
             pt_3d = self._frames_dict[first_frame_id].get_3d_point(matches[i][0])
@@ -459,7 +494,6 @@ class DataBase:
                 row = [float(n) for n in row]
                 row = np.array(row)
                 row = row.reshape((3, 4))
-                # frame_id, x, y, z = int(row[0]), float(row[1]), float(row[2]), float(row[3])
                 # assume frames_dict is full
                 self._frames_dict[frame_id].set_left_camera_pose_mat(row)
 

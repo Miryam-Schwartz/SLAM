@@ -12,8 +12,9 @@ POINT_SYMBOL = 'q'
 
 class BundleWindow:
     """
-        A class used to represent single bundle window
-
+        A class used to represent single bundle window. Bundle window is sequence of some frames with their key points.
+        Given initial estimate (from database), we can optimize positions of cameras and points.
+        All positions in the window are in first keyframe coordinates.
         ...
 
         Attributes

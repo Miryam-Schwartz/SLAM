@@ -1,17 +1,36 @@
 import gtsam
 import numpy as np
 import networkx as nx
-
 from gtsam.utils import plot
 
 from VAN_ex.code.Bundle.BundleWindow import CAMERA_SYMBOL
 
 
 def cov_weight_square_det(cov_mat):
+    """
+    :param cov_mat: covariance matrix (np array)
+    :return: square determinant of matrix
+    """
     return np.square(np.linalg.det(cov_mat))
 
 
 class PoseGraph:
+    """
+        A class used to represent Pose graph. A Pose graph is a skeleton graph that is created from bundle adjustment
+        graph. to create pose graph we are dropping unnecessary data (frames that are not keyframes and points).
+        This leaves us with a graph contains only keyframes and factors between them.
+        ...
+
+        Attributes
+        ----------
+        _bundle_adjustment : BundleAdjustment
+            bundle adjustment instance
+        _initial_estimate   :   gtsam.Values
+            like a dictionary object. associate between keyframe to its initial guess position
+            (taken from bundle adjustment).
+        _current_values :   gtsam.Values
+            associate between keyframe to its optimized value. before the optimization, initial estimate is saved here.
+        """
     def __init__(self, bundle_adjustment):
         self._bundle_adjustment = bundle_adjustment
         self._initial_estimate = self._init_initial_estimate()
@@ -26,7 +45,6 @@ class PoseGraph:
         self._prior_factor = \
             gtsam.PriorFactorPose3(gtsam.symbol(CAMERA_SYMBOL, 0), gtsam.Pose3(), cov)
         self._graph.add(self._prior_factor)
-        # self._graph = self._init_graph()
         self._optimizer = gtsam.LevenbergMarquardtOptimizer(self._graph, self._initial_estimate)
 
     def _init_shortest_path_graph(self):
@@ -42,7 +60,6 @@ class PoseGraph:
         return initial_estimate
 
     def _init_factors(self):
-
         relative_motions, relative_covs = self._bundle_adjustment.get_relative_motion_and_covariance()
         for keyframes_tuple, motion in relative_motions.items():
             first_keyframe_id, second_keyframe_id = keyframes_tuple
@@ -111,14 +128,6 @@ class PoseGraph:
         result = self.get_current_values()
         plot.plot_trajectory(0, result, marginals=marginals, scale=1, title=f"Loop closure after iteration {j}",
                              save_file=output_path, d2_view=True)
-
-    # def get_covariance_n_given_i(self, i_keyframe, n_keyframe):
-    #     keys = gtsam.KeyVector()
-    #     keys.append(gtsam.symbol(CAMERA_SYMBOL, i_keyframe))
-    #     keys.append(gtsam.symbol(CAMERA_SYMBOL, n_keyframe))
-    #     marginals = self.get_marginals()
-    #     sliced_inform_mat = marginals.jointMarginalInformation(keys).at(keys[-1], keys[-1])
-    #     return np.linalg.inv(sliced_inform_mat)
 
     def get_pose_obj(self, keyframe_id):
         return self._current_values.atPose3(gtsam.symbol(CAMERA_SYMBOL, keyframe_id))
