@@ -1,0 +1,28 @@
+--- SIFT detector ---
+Total number of tracks:  34917
+Number of frames:  180
+Mean track length: 3.4795085488444024
+Maximum track length: 34
+Minimum track length: 2
+--- ORB detector ---
+Total number of tracks:  3330
+Number of frames:  180
+Mean track length: 2.936036036036036
+Maximum track length: 16
+Minimum track length: 2
+--- AKAZE detector ---
+Total number of tracks:  18037
+Number of frames:  180
+Mean track length: 4.791983145755946
+Maximum track length: 94
+Minimum track length: 2
+--- BRIEF detector ---
+Total number of tracks:  4778
+Number of frames:  180
+Mean track length: 3.3329845123482627
+Maximum track length: 36
+Minimum track length: 2
+SIFT runtime: 184.69218230247498
+ORB runtime: 44.47422385215759
+AKAZE runtime: 97.23503375053406
+BRIEF runtime: 28.443875074386597

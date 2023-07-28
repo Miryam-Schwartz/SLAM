@@ -30,12 +30,13 @@ class DataBase:
             concatenating of t matrices
         """
 
-    def __init__(self):
+    def __init__(self, detector_type='SIFT'):
         self._tracks_dict = dict()
         self._frames_dict = dict()
         self._dict_matches_between_frames = dict()  # key = (first frame, second frame), value = list of tuples of idx
         self._concat_r = np.identity(3)
         self._concat_t = np.zeros(3)
+        self._detector_type = detector_type
 
     def get_tracks_of_frame(self, frame_id):
         """
@@ -188,13 +189,12 @@ class DataBase:
         self.set_initial_camera(k, m_left, m_right)
         for i in range(frame_number):
             print(f'---- frame iteration {i}----')
-            left_kp, left_des, right_kp, right_des = DataBase._match_in_frame(i)
+            left_kp, left_des, right_kp, right_des = self._match_in_frame(i)
             left_kp = [kp.pt for kp in left_kp]
             right_kp = [kp.pt for kp in right_kp]
             self.add_frame(i, left_kp, right_kp, left_des)
 
-    @staticmethod
-    def _match_in_frame(im_idx, threshold=1):
+    def _match_in_frame(self, im_idx, threshold=1):
         """
         Read frame images, find KeyPoints on both images, find matches between them, and use rectified stereo pattern to
         reject not suitable matches
@@ -204,7 +204,7 @@ class DataBase:
         :return: np arrays of: left_key-points, left_descriptors, right_key-points, right_descriptors
         """
         left_img, right_img = utils.read_images(im_idx)
-        left_kp, left_des, right_kp, right_des = utils.detect_and_compute(left_img, right_img)
+        left_kp, left_des, right_kp, right_des = utils.detect_and_compute(left_img, right_img, self._detector_type)
         matches = utils.find_matches(left_des, right_des)
         left_kp, left_des, right_kp, right_des, _ =\
             utils.get_correlated_kps_and_des_from_matches(left_kp, left_des, right_kp, right_des, matches)
@@ -280,6 +280,7 @@ class DataBase:
         # print("matches number between frames: ", size)
         max_supporters_num = 0
         idxs_max_supports_matches = None
+        extrinsic_camera_mat_second_frame_left_of_max = None
         while eps > 0 and i < utils.calc_max_iterations(p, eps, 4):
             points_2d, points_3d = self._sample_4_points(first_frame_id, second_frame_id, matches)
             extrinsic_camera_mat_second_frame_left, extrinsic_camera_mat_second_frame_right = \
@@ -295,29 +296,35 @@ class DataBase:
             if supporters_num > max_supporters_num:
                 max_supporters_num = supporters_num
                 idxs_max_supports_matches = idxs_of_supporters_matches
+                extrinsic_camera_mat_second_frame_left_of_max = extrinsic_camera_mat_second_frame_left
                 # update eps
                 eps = (size - max_supporters_num) / size
             i += 1
         points_3d_supporters = np.empty((max_supporters_num, 3))
         points_2d_supporters = np.empty((max_supporters_num, 2))
+        # print("supporters num ",max_supporters_num, "from all matches", len(matches))
         for i in range(max_supporters_num):
             cur_match = matches[idxs_max_supports_matches[i]]
             points_3d_supporters[i] = self._frames_dict[first_frame_id].get_3d_point(cur_match[0])
             pixel_left, pixel_right = self._frames_dict[second_frame_id].get_feature_pixels(cur_match[1])
             points_2d_supporters[i] = np.array(pixel_left)
-        extrinsic_camera_mat_second_frame_left, extrinsic_camera_mat_second_frame_right = \
+        extrinsic_camera_mat_second_frame_left2, extrinsic_camera_mat_second_frame_right2 = \
             utils.estimate_second_frame_mats_pnp(points_2d_supporters, points_3d_supporters,
                                                  Frame.INDENTATION_RIGHT_CAM_MAT, Frame.k,
                                                  flag=cv.SOLVEPNP_ITERATIVE)
 
-        idxs_max_supports_matches = self._find_supporters(first_frame_id, second_frame_id, matches,
-                                                          extrinsic_camera_mat_second_frame_left,
-                                                          extrinsic_camera_mat_second_frame_right)
+        idxs_max_supports_matches2 = self._find_supporters(first_frame_id, second_frame_id, matches,
+                                                          extrinsic_camera_mat_second_frame_left2,
+                                                          extrinsic_camera_mat_second_frame_right2)
         matches = np.array(matches)
         idxs_max_supports_matches = np.array(idxs_max_supports_matches)
+        idxs_max_supports_matches2 = np.array(idxs_max_supports_matches2)
         # print("supporters num ", idxs_max_supports_matches.shape[0])
-        return extrinsic_camera_mat_second_frame_left, matches[idxs_max_supports_matches], \
-            (len(idxs_max_supports_matches) / len(matches)) * 100
+        if idxs_max_supports_matches2.shape[0] == 0:
+            print(f"RANSAC between frames {first_frame_id},{second_frame_id} go bad: no supperters, return the first max extrinsic (without rerun)")
+            return extrinsic_camera_mat_second_frame_left_of_max, matches[idxs_max_supports_matches],  (len(idxs_max_supports_matches) / len(matches)) * 100
+        return extrinsic_camera_mat_second_frame_left2, matches[idxs_max_supports_matches2], \
+            (len(idxs_max_supports_matches2) / len(matches)) * 100
 
     def _sample_4_points(self, first_frame_id, second_frame_id, matches):
         rand_idxs = random.sample(range(len(matches)), 4)
