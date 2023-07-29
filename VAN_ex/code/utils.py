@@ -1,5 +1,5 @@
 import cv2 as cv
-#import gtsam
+import gtsam
 import numpy as np
 # from matplotlib import pyplot as plt
 import plotly.express as px
@@ -7,10 +7,9 @@ import plotly.graph_objs as go
 from matplotlib import pyplot as plt
 
 # current year data
-#DATA_PATH = r'/mnt/c/Users/Miryam/SLAM/VAN_ex/dataset/sequences/05/'
-DATA_PATH = 'C:\\Users\\User\\SLAM\\VAN_ex\\dataset\\sequences\\05\\'
+DATA_PATH = r'/mnt/c/Users/Miryam/SLAM/VAN_ex/dataset/sequences/05/'
 DB_PATH = r'/mnt/c/Users/Miryam/SLAM/VAN_ex/code/DB/'
-GROUND_TRUTH_PATH = 'C:\\Users\\User\\SLAM\\VAN_ex\\dataset\\poses\\05.txt'
+GROUND_TRUTH_PATH = '/mnt/c/Users/Miryam/SLAM/VAN_ex/dataset/poses/05.txt'
 FRAMES_NUM = 2560
 
 # last year data
