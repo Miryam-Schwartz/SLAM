@@ -300,6 +300,11 @@ class DataBase:
                 # update eps
                 eps = (size - max_supporters_num) / size
             i += 1
+        if max_supporters_num < 6:
+            print(f"supporters num: {max_supporters_num}, not runing PnP again")
+            matches = np.array(matches)
+            idxs_max_supports_matches = np.array(idxs_max_supports_matches)
+            return extrinsic_camera_mat_second_frame_left_of_max, matches[idxs_max_supports_matches],  (len(idxs_max_supports_matches) / len(matches)) * 100
         points_3d_supporters = np.empty((max_supporters_num, 3))
         points_2d_supporters = np.empty((max_supporters_num, 2))
         # print("supporters num ",max_supporters_num, "from all matches", len(matches))
