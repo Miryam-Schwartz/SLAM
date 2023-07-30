@@ -1,0 +1,20 @@
+--- SIFT detector ---
+Total number of tracks:  164105
+Number of frames:  1000
+Mean track length: 3.5236586331921638
+Maximum track length: 67
+Minimum track length: 2
+--- AKAZE detector ---
+Total number of tracks:  92161
+Number of frames:  1000
+Mean track length: 4.855285858443376
+Maximum track length: 154
+Minimum track length: 2
+--- BRIEF detector ---
+Total number of tracks:  25657
+Number of frames:  1000
+Mean track length: 3.3952527575320577
+Maximum track length: 36
+Minimum track length: 2
+
+Process finished with exit code 0

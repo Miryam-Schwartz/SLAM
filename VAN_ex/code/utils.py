@@ -31,16 +31,30 @@ def read_images(idx):
     return img1, img2
 
 
-def detect_and_compute(img1, img2):
+def detect_and_compute(img1, img2, detector_type = 'SIFT'):
     """
     Call CV algorithms sift to detect and compute features in right and left pictures
     :param img1:
     :param img2:
     :return: key points and descriptors for right & left images
     """
-    sift = cv.SIFT_create()
-    kp1, des1 = sift.detectAndCompute(img1, None)
-    kp2, des2 = sift.detectAndCompute(img2, None)
+    detector = None
+    if detector_type == 'SIFT':
+        detector = cv.SIFT_create()
+    if detector_type == 'ORB': #work bed (ransac failed)
+        detector = cv.ORB_create()
+    if detector_type == 'AKAZE': #work
+        detector = cv.AKAZE_create()
+    if detector_type == 'BRIEF':
+        star = cv.xfeatures2d.StarDetector_create()
+        brief = cv.xfeatures2d.BriefDescriptorExtractor_create()
+        kp1 = star.detect(img1,None)
+        kp2 = star.detect(img2,None)
+        kp1, des1 = brief.compute(img1, kp1)
+        kp2, des2 = brief.compute(img2, kp2)
+        return kp1, des1, kp2, des2
+    kp1, des1 = detector.detectAndCompute(img1, None)
+    kp2, des2 = detector.detectAndCompute(img2, None)
     return kp1, des1, kp2, des2
 
 
