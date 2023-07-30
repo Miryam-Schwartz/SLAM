@@ -30,6 +30,7 @@ class PoseGraph:
             (taken from bundle adjustment).
         _current_values :   gtsam.Values
             associate between keyframe to its optimized value. before the optimization, initial estimate is saved here.
+        _shortest_path_graph    :
         """
     def __init__(self, bundle_adjustment):
         self._bundle_adjustment = bundle_adjustment

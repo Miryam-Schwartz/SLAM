@@ -37,7 +37,7 @@ class BundleAdjustment:
         while last_keyframe < self._frames_num - 1:
             bundle_windows[first_keyframe] = BundleWindow(self._db, first_keyframe, last_keyframe)
             first_keyframe = last_keyframe
-            last_keyframe = int(self._get_median_track_len_from_frame(first_keyframe))
+            last_keyframe = first_keyframe + int(self._get_median_track_len_from_frame(first_keyframe))
 
         last_keyframe = min(last_keyframe, self._frames_num - 1)
         bundle_windows[first_keyframe] = BundleWindow(self._db, first_keyframe, last_keyframe)
@@ -57,9 +57,11 @@ class BundleAdjustment:
         poses = dict()  # key = keyframe, val = pose
         poses[0] = gtsam.Pose3()
         for first_keyframe, window in self._bundle_windows.items():
-            last_keyframe = min(first_keyframe + self._window_len - 1, self._frames_num - 1)
+            # todo
+            last_keyframe = window.get_last_keyframe_id()
             global_pose_last_keyframe = poses[first_keyframe] * window.get_frame_pose3(last_keyframe)
             poses[last_keyframe] = global_pose_last_keyframe
+            print(f'pose {last_keyframe}: {global_pose_last_keyframe}')
         return poses
 
     def get_relative_motion_and_covariance(self):

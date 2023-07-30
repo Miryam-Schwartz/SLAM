@@ -95,12 +95,14 @@ if __name__ == '__main__':
     # db.save_database(utils.DB_PATH)
 
     db.read_database(utils.DB_PATH)
+    print('finished read data')
 
     pnp_mats = db.get_left_camera_mats_in_world_coordinates()
     pnp_locations = utils.calculate_ground_truth_locations_from_matrices(pnp_mats)
 
     bundle_adjustment = BundleAdjustment(utils.FRAMES_NUM, 0, db)
     bundle_adjustment.optimize_all_windows()
+    print('finished bundle adjustment')
     bundle_adjustment_poses = bundle_adjustment.get_global_keyframes_poses()  # dict
     bundle_adjustment_mats = from_gtsam_poses_to_world_coordinates_mats(bundle_adjustment_poses)
     bundle_adjustment_locations = \
@@ -111,6 +113,7 @@ if __name__ == '__main__':
                                threshold_inliers_rel=0.4)
     full_cov_before_LC = np.array(pose_graph.get_covraince_all_poses())
     loops_dict = loop_closure.find_loops('', plot=False)
+    print('finished loop closure')
     full_cov_after_LC = np.array(pose_graph.get_covraince_all_poses())
     loop_closure_poses = pose_graph.get_global_keyframes_poses()  # dict
     loop_closure_mats = from_gtsam_poses_to_world_coordinates_mats(loop_closure_poses)
