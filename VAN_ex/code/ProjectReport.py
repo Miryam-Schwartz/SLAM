@@ -33,8 +33,8 @@ def present_tracking_statistics(database):
     print("Total number of tracks: ", database.get_tracks_number())
     print("Number of frames: ", database.get_frames_number())
     mean, max_t, min_t = database.get_mean_max_and_min_track_len()
-    print(f"Mean track length: {mean}\nMaximum track length: {max_t}\nMinimum track length: {min_t}")
-    print("Mean number of tracks on average frame: ", database.get_mean_number_of_tracks_on_frame())
+    print(f"Mean track length: {round(mean, 3)}\nMaximum track length: {max_t}\nMinimum track length: {min_t}")
+    print("Mean number of tracks on average frame: ", round(database.get_mean_number_of_tracks_on_frame(), 3))
     number_of_matches_per_frame_graph(database)
     # utils.inliers_percentage_graph(db, output_path=OUTPUT_DIR)
 
@@ -67,7 +67,7 @@ def plot_bundle_error_before_after_opt(keyframes_list, mean_factor_error_before,
     fig.write_image(f'{OUTPUT_DIR}{title}.png')
 
 
-def PnP_median_projection_error_per_distance():
+def PnP_median_projection_error_per_distance(pnp_mats):
     random_track_ids = random.sample(range(db.get_tracks_number()), 500)
     # left_camera_mats_in_world_coordinates = db.get_left_camera_mats_in_world_coordinates()
     # key = distance from last frame of track, value = list of projection errors (from different tracks)
@@ -140,7 +140,7 @@ def from_gtsam_poses_to_world_coordinates_mats(poses_dict):
     return np.array(mats_list)
 
 
-def BA_median_projection_error_per_distance():
+def BA_median_projection_error_per_distance(bundle_adjustment):
     distances, median_proj_err_left, median_proj_err_right, links_num_per_distance =\
         bundle_adjustment.get_median_projection_error_per_distance()
     fig = plt.figure()
@@ -165,7 +165,7 @@ def BA_median_projection_error_per_distance():
     # fig.write_image(f'{OUTPUT_DIR}BA_median_projection_error_vs_distance_from_last_frame.png')
 
 
-def plot_location_error_along_axes(ground_truth, estimation, title):
+def plot_location_error_along_axes(ground_truth, estimation, title, keyframes_list):
     # ground truth and estimation is list of locations (vector with 3 coordinates)
     diff = np.abs(ground_truth - estimation)
     x_error = diff[:, 0]
@@ -182,7 +182,7 @@ def plot_location_error_along_axes(ground_truth, estimation, title):
     fig.write_image(f'{OUTPUT_DIR}axes_estimation_error_{title}.png')
 
 
-def plot_angle_error(ground_truth_matrices, estimation_mats, title):
+def plot_angle_error(ground_truth_matrices, estimation_mats, title, keyframes_list):
     length = ground_truth_matrices.shape[0]
     angle_error = np.empty(length)
     for i in range(length):
@@ -196,12 +196,12 @@ def plot_angle_error(ground_truth_matrices, estimation_mats, title):
     fig.write_image(f'{OUTPUT_DIR}angle_estimation_error_{title}.png')
 
 
-def loop_closure_statistics():
+def loop_closure_statistics(loops_dict):
     print("Number of Matches and Inliers Percentage in loop closure:")
     for loop, inliers_and_outliers in loops_dict.items():
         inliers_i, inliers_n, outliers_i, outliers_n = inliers_and_outliers
         inliers_percentage = (len(inliers_i) / (len(inliers_i) + len(outliers_i))) * 100
-        print(f"loop {loop}: matches number - {len(inliers_i)}, inliers percentage - {inliers_percentage}")
+        print(f"loop {loop}: matches number - {len(inliers_i)}, inliers percentage - {round(inliers_percentage, 3)}")
 
 
 def plot_uncertainty(cov_list_before, cov_list_after, keyframes, title):
@@ -309,7 +309,7 @@ def plot_relative_estimation_error_in_sequences(title_model, title_error_type, l
     plt.legend()
     fig.savefig(f'{OUTPUT_DIR}{title_model}_{title_error_type}_relative_estimation_error_in_seq.png')
     plt.close(fig)
-    print(f"Relative {title_model} estimation error - Avarege {title_error_type} error of all the sequences: {avg}")
+    print(f"Relative {title_model} estimation error - Avarege {title_error_type} error of all the sequences: {round(avg, 4)}")
 
 
 def plot_links_num_per_distance(pnp_distances, pnp_links_num_per_distance, ba_distances, ba_links_num_per_distance):
@@ -331,7 +331,11 @@ if __name__ == '__main__':
     ground_truth_mats = np.array(utils.read_ground_truth_matrices(utils.GROUND_TRUTH_PATH))
     ground_truth_locations = utils.calculate_ground_truth_locations_from_matrices(ground_truth_mats)
 
-    db = DataBase()
+    db = DataBase(detector_type='AKAZE')
+
+    # db.fill_database(utils.FRAMES_NUM)
+    # db.save_database(utils.DB_PATH)
+
     db.read_database(utils.DB_PATH)
     pnp_mats = db.get_left_camera_mats_in_world_coordinates()
     pnp_locations = utils.calculate_ground_truth_locations_from_matrices(pnp_mats)
@@ -383,26 +387,26 @@ if __name__ == '__main__':
         (keyframes_list, median_projection_error_before, median_projection_error_after,
          'median projection error')
 
-    pnp_distances, pnp_links_num_per_distance = PnP_median_projection_error_per_distance()  # distance from last frame of track were we computed triangulation
+    pnp_distances, pnp_links_num_per_distance = PnP_median_projection_error_per_distance(pnp_mats)  # distance from last frame of track were we computed triangulation
 
-    ba_distances, ba_links_num_per_distance = BA_median_projection_error_per_distance()  # distance from last frame of min(track, window) were we computed triangulation
+    ba_distances, ba_links_num_per_distance = BA_median_projection_error_per_distance(bundle_adjustment)  # distance from last frame of min(track, window) were we computed triangulation
 
     plot_links_num_per_distance(pnp_distances, pnp_links_num_per_distance, ba_distances, ba_links_num_per_distance)
 
     ground_truth_mats_of_keyframes = ground_truth_mats[keyframes_list]
     ground_truth_locations_of_keyframes = ground_truth_locations[keyframes_list]
 
-    plot_location_error_along_axes(ground_truth_locations, pnp_locations, 'PnP')
-    plot_angle_error(ground_truth_mats, pnp_mats, 'PnP')
+    plot_location_error_along_axes(ground_truth_locations, pnp_locations, 'PnP', keyframes_list)
+    plot_angle_error(ground_truth_mats, pnp_mats, 'PnP', keyframes_list)
 
     plot_location_error_along_axes(ground_truth_locations_of_keyframes, bundle_adjustment_locations,
-                                   'BA')  # pose graph without LC
-    plot_angle_error(ground_truth_mats_of_keyframes, bundle_adjustment_mats, 'BA')
+                                   'BA', keyframes_list)  # pose graph without LC
+    plot_angle_error(ground_truth_mats_of_keyframes, bundle_adjustment_mats, 'BA', keyframes_list)
 
-    plot_location_error_along_axes(ground_truth_locations_of_keyframes, loop_closure_locations, 'LC')
-    plot_angle_error(ground_truth_mats_of_keyframes, loop_closure_mats, 'LC')
+    plot_location_error_along_axes(ground_truth_locations_of_keyframes, loop_closure_locations, 'LC', keyframes_list)
+    plot_angle_error(ground_truth_mats_of_keyframes, loop_closure_mats, 'LC', keyframes_list)
 
-    loop_closure_statistics()
+    loop_closure_statistics(loops_dict)
 
     # uncertainty size vs keyframes
     covs_angle_before, covs_location_before = slice_cov_mat_to_localization_angle(full_cov_before_LC)

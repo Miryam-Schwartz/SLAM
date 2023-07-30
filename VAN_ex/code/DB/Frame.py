@@ -47,7 +47,6 @@ class Frame:
         self._des_left = des_left
         self._tracks_dict = dict()  # key = track_id, val = track object
         self._inliers_percentage = None
-        # self._left_camera_location = None  # in left0 coordinates system
         self._left_camera_pose_mat = None
 
     def get_tracks_dict(self):
@@ -102,11 +101,6 @@ class Frame:
                 lens_outgoing_tracks.append(last_frame_id - self._frame_id)
         return lens_outgoing_tracks
 
-    # def get_left_camera_location(self):
-    #     if self._left_camera_location is None:
-    #         raise "location is None"
-    #     return self._left_camera_location
-
     def get_left_camera_pose_mat(self):
         if self._left_camera_pose_mat is None:
             raise "pose is None"
@@ -119,9 +113,6 @@ class Frame:
 
     def set_inliers_percentage(self, percentage):
         self._inliers_percentage = percentage
-
-    # def set_left_camera_location(self, location):
-    #     self._left_camera_location = location
 
     def set_left_camera_pose_mat(self, pose_mat):
         self._left_camera_pose_mat = pose_mat

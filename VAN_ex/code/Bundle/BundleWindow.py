@@ -149,7 +149,7 @@ class BundleWindow:
             pt_3d = last_frame_stereo_cam.backproject(pt_2d)
 
             # filter points with negative or too big z value
-            if pt_3d[2] <= 0 or pt_3d[2] >= 200:
+            if pt_3d[2] <= 0 or pt_3d[2] >= 100:
                 continue
             else:
                 values.insert(gtsam.symbol(POINT_SYMBOL, track_id), pt_3d)
@@ -245,12 +245,10 @@ class BundleWindow:
 
     def get_pixels_before_and_after_optimize(self, frame_id, track_id):
         """
-
         :param frame_id:
         :param track_id:
-        :return: 3 np arrays with the pixel of track_id point on frame_id image. the pixels are: measurment (from sift),
+        :return: 3 np arrays with the pixel of track_id point on frame_id image. the pixels are: measurment (key point),
         before optimization (project 3d point on frame image) and after bundle adjustment optimization
-        todo what is the difference betwwen measurment to before
         """
         left_pixel, right_pixel = self._db.get_feature(frame_id, track_id)
         x_l, x_r, y = left_pixel[0], right_pixel[0], (left_pixel[1] + right_pixel[1]) / 2

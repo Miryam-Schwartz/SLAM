@@ -28,6 +28,8 @@ class DataBase:
             concatenating of R matrices multiplication
         _concat_t: np.Array in length 3
             concatenating of t matrices
+        _detector_type: str
+            name of detector type to detect key-points on images
         """
 
     def __init__(self, detector_type='SIFT'):
@@ -240,10 +242,6 @@ class DataBase:
         extrinsic_camera_mat_second_frame_left, matches, inliers_percentage = \
             self.RANSAC(first_frame_id, second_frame_id, matches)
 
-        # cur_r = extrinsic_camera_mat_second_frame_left[:, :3]
-        # cur_t = extrinsic_camera_mat_second_frame_left[:, 3]
-        # self._find_cam_location_and_concat_mats(second_frame_id, cur_r, cur_t)
-
         self._dict_matches_between_frames[(first_frame_id, second_frame_id)] = matches
 
         first_frame = self._frames_dict[first_frame_id]
@@ -267,12 +265,6 @@ class DataBase:
                 second_frame.add_track(new_track)
                 self._tracks_dict[new_track.get_id()] = new_track
 
-    # def _find_cam_location_and_concat_mats(self, second_frame_id, cur_r, cur_t):
-    #     self._concat_r = cur_r @ self._concat_r
-    #     self._concat_t = cur_r @ self._concat_t + cur_t
-    #     left_cam_location = ((-self._concat_r.T @ self._concat_t).reshape(1, 3))[0]
-    #     self._frames_dict[second_frame_id].set_left_camera_location(left_cam_location)
-
     def RANSAC(self, first_frame_id, second_frame_id, matches):
         p, eps = 0.99, 0.99  # eps = prob to be outlier
         i = 0
@@ -291,8 +283,6 @@ class DataBase:
                                                                extrinsic_camera_mat_second_frame_left,
                                                                extrinsic_camera_mat_second_frame_right)
             supporters_num = len(idxs_of_supporters_matches)
-            if first_frame_id == 2387:
-                print("supporters num ", supporters_num)
             if supporters_num > max_supporters_num:
                 max_supporters_num = supporters_num
                 idxs_max_supports_matches = idxs_of_supporters_matches
@@ -342,25 +332,25 @@ class DataBase:
             points_2d[i] = np.array(pixel_left)
         return points_2d, points_3d
 
-    def _sample_4_points_with_filter(self, first_frame_id, second_frame_id, matches):
-        rand_idxs = set()
-        points_3d = np.empty((4, 3))
-        points_2d = np.empty((4, 2))
-        i = 0
-        while i < 4:
-            rand_idx = random.randint(0, len(matches)-1)
-            if rand_idx in rand_idxs:
-                continue
-            rand_idxs.add(rand_idx)
-            cur_match = matches[rand_idx]  # kp_idx of first frame, kp_idx of second frame
-            point_3d = self._frames_dict[first_frame_id].get_3d_point(cur_match[0])
-            if point_3d[2] > 200 or point_3d[2] <= 0:
-                continue
-            points_3d[i] = point_3d
-            pixel_left, pixel_right = self._frames_dict[second_frame_id].get_feature_pixels(cur_match[1])
-            points_2d[i] = np.array(pixel_left)
-            i += 1
-        return points_2d, points_3d
+    # def _sample_4_points_with_filter(self, first_frame_id, second_frame_id, matches):
+    #     rand_idxs = set()
+    #     points_3d = np.empty((4, 3))
+    #     points_2d = np.empty((4, 2))
+    #     i = 0
+    #     while i < 4:
+    #         rand_idx = random.randint(0, len(matches)-1)
+    #         if rand_idx in rand_idxs:
+    #             continue
+    #         rand_idxs.add(rand_idx)
+    #         cur_match = matches[rand_idx]  # kp_idx of first frame, kp_idx of second frame
+    #         point_3d = self._frames_dict[first_frame_id].get_3d_point(cur_match[0])
+    #         if point_3d[2] > 200 or point_3d[2] <= 0:
+    #             continue
+    #         points_3d[i] = point_3d
+    #         pixel_left, pixel_right = self._frames_dict[second_frame_id].get_feature_pixels(cur_match[1])
+    #         points_2d[i] = np.array(pixel_left)
+    #         i += 1
+    #     return points_2d, points_3d
 
     def _find_supporters(self, first_frame_id, second_frame_id, matches, extrinsic_camera_mat_second_frame_left,
                          extrinsic_camera_mat_second_frame_right):

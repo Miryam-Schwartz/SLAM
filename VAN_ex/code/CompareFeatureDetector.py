@@ -9,6 +9,7 @@ from matplotlib import pyplot as plt
 OUTPUT_DIR = 'results/compare_feature_detector/'
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+
 def present_db_statistics(db, title):
     print(f'--- {title} detector ---')
     print("Total number of tracks: ", db.get_tracks_number())
@@ -34,21 +35,21 @@ if __name__ == '__main__':
     end = time.time()
     sift_time = end - start
 
-    #ORB
-    #start = time.time()
-    #db_orb = DataBase('ORB')
-    #db_orb.fill_database(frames_num)
-    #end = time.time()
-    #orb_time = end - start
+    # ORB
+    # start = time.time()
+    # db_orb = DataBase('ORB')
+    # db_orb.fill_database(frames_num)
+    # end = time.time()
+    # orb_time = end - start
 
-    #AKAZE
+    # AKAZE
     start = time.time()
     db_akaze = DataBase('AKAZE')
     db_akaze.fill_database(frames_num)
     end = time.time()
     akaze_time = end - start
 
-    #BRIEF
+    # BRIEF
     start = time.time()
     db_brief = DataBase('BRIEF')
     db_brief.fill_database(frames_num)
@@ -57,8 +58,8 @@ if __name__ == '__main__':
 
     inliers_percentage_per_frame_sift = get_inliers_percentage_per_frame(db_sift)
     present_db_statistics(db_sift, 'SIFT')
-    #inliers_percentage_per_frame_orb = get_inliers_percentage_per_frame(db_orb)
-    #present_db_statistics(db_orb, 'ORB')
+    # inliers_percentage_per_frame_orb = get_inliers_percentage_per_frame(db_orb)
+    # present_db_statistics(db_orb, 'ORB')
     inliers_percentage_per_frame_akaze = get_inliers_percentage_per_frame(db_akaze)
     present_db_statistics(db_akaze, 'AKAZE')
     inliers_percentage_per_frame_brief = get_inliers_percentage_per_frame(db_brief)
@@ -68,7 +69,7 @@ if __name__ == '__main__':
     fig = plt.figure()
     plt.title("Inliers percentage with different feature detectors")
     plt.plot(np.arange(frames_num), inliers_percentage_per_frame_sift, label="SIFT")
-    #plt.plot(np.arange(frames_num), inliers_percentage_per_frame_orb, label="ORB")
+    # plt.plot(np.arange(frames_num), inliers_percentage_per_frame_orb, label="ORB")
     plt.plot(np.arange(frames_num), inliers_percentage_per_frame_akaze, label="AKAZE")
     plt.plot(np.arange(frames_num), inliers_percentage_per_frame_brief, label="BRIEF")
     plt.ylabel("Inliers percentage")
@@ -82,7 +83,7 @@ if __name__ == '__main__':
     ground_truth_locations = utils.calculate_ground_truth_locations_from_matrices(ground_truth_matrices)
 
     sift_locations = db_sift.get_camera_locations()
-    #orb_locations = db_orb.get_camera_locations()
+    # orb_locations = db_orb.get_camera_locations()
     akaze_locations = db_akaze.get_camera_locations()
     brief_locations = db_brief.get_camera_locations()
 
@@ -91,7 +92,7 @@ if __name__ == '__main__':
                label='Ground Truth', s=30, alpha=0.4, c='tab:gray')
     ax.scatter(x=sift_locations[:, 0], y=sift_locations[:, 2],
                label='SIFT', s=30, alpha=0.7, c='tab:blue')
-    #ax.scatter(x=orb_locations[:, 0], y=orb_locations[:, 2],
+    # ax.scatter(x=orb_locations[:, 0], y=orb_locations[:, 2],
     #           label='ORB', s=30, alpha=0.7, c='tab:orange')
     ax.scatter(x=akaze_locations[:, 0], y=akaze_locations[:, 2],
                label='AKAZE', s=30, alpha=0.7, c='tab:orange')
@@ -106,14 +107,14 @@ if __name__ == '__main__':
     # calculate PnP localization error
     gt_locations_sliced = ground_truth_locations[:frames_num]
     sift_error = np.sum(np.abs(gt_locations_sliced - sift_locations) ** 2, axis=-1) ** 0.5
-    #orb_error = np.sum(np.abs(gt_locations_sliced - orb_locations) ** 2, axis=-1) ** 0.5
+    # orb_error = np.sum(np.abs(gt_locations_sliced - orb_locations) ** 2, axis=-1) ** 0.5
     akaze_error = np.sum(np.abs(gt_locations_sliced - akaze_locations) ** 2, axis=-1) ** 0.5
     brief_error = np.sum(np.abs(gt_locations_sliced - brief_locations) ** 2, axis=-1) ** 0.5
 
     fig = plt.figure()
     plt.title("Compare estimation location error with different feature detectors")
     plt.plot(np.arange(frames_num), sift_error, label="SIFT")
-    #plt.plot(np.arange(frames_num), orb_error, label="ORB")
+    # plt.plot(np.arange(frames_num), orb_error, label="ORB")
     plt.plot(np.arange(frames_num), akaze_error, label="AKAZE")
     plt.plot(np.arange(frames_num), brief_error, label="BRIEF")
     plt.ylabel("location error")
@@ -124,6 +125,6 @@ if __name__ == '__main__':
 
     # print runtime
     print(f"SIFT runtime: {sift_time}")
-    #print(f"ORB runtime: {orb_time}")
+    # print(f"ORB runtime: {orb_time}")
     print(f"AKAZE runtime: {akaze_time}")
     print(f"BRIEF runtime: {brief_time}")
