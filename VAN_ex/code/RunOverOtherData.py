@@ -140,9 +140,9 @@ def run_over_other_data():
     pose_graph = PoseGraph(bundle_adjustment)
     loop_closure = LoopClosure(db, pose_graph, threshold_close=500,
                                threshold_inliers_rel=0.4)
-    full_cov_before_LC = np.array(pose_graph.get_covraince_all_poses())
+    full_cov_before_LC = np.array(pose_graph.get_covariance_all_poses())
     loops_dict = loop_closure.find_loops('', plot=False)
-    full_cov_after_LC = np.array(pose_graph.get_covraince_all_poses())
+    full_cov_after_LC = np.array(pose_graph.get_covariance_all_poses())
     loop_closure_poses = pose_graph.get_global_keyframes_poses()  # dict
     loop_closure_mats = from_gtsam_poses_to_world_coordinates_mats(loop_closure_poses)
     loop_closure_locations = BundleAdjustment.from_poses_to_locations(loop_closure_poses)

@@ -88,9 +88,9 @@ if __name__ == '__main__':
     global_locations = BundleAdjustment.from_poses_to_locations(global_poses)
 
     loop_closure = LoopClosure(db, pose_graph, threshold_close=500, threshold_inliers_rel=0.4)
-    cov_list_before = pose_graph.get_covraince_all_poses()
+    cov_list_before = pose_graph.get_covariance_all_poses()
     loops_dict = loop_closure.find_loops(OUTPUT_DIR)
-    cov_list_after = pose_graph.get_covraince_all_poses()
+    cov_list_after = pose_graph.get_covariance_all_poses()
 
     # 7.5
     print(f"Number of successful loop closures that were detected: {len(loops_dict)}")

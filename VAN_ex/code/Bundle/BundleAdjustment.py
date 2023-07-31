@@ -22,7 +22,6 @@ class BundleAdjustment:
         _bundle_windows  : dict
             containing all bundle windows that covers all the trajectory. Key is int - first keyframe id of the window.
             Value is bundle window object.
-
         """
 
     def __init__(self, frames_num, window_len, db):

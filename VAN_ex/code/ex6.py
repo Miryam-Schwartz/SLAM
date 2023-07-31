@@ -45,10 +45,6 @@ def q6_1(bundle_adjustment):
 
 
 def q6_2(bundle_adjustment):
-    """
-    Pose Graph
-    :param bundle_adjustment:
-    """
     pose_graph = PoseGraph(bundle_adjustment)
     global_poses = pose_graph.get_global_keyframes_poses()
     locations = BundleAdjustment.from_poses_to_locations(global_poses)

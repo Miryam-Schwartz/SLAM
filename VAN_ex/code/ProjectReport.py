@@ -180,6 +180,8 @@ def plot_location_error_along_axes(ground_truth, estimation, title, keyframes_li
 
     fig.update_layout(title=f'Axes Estimation Error - {title}', xaxis_title='Keyframe id', yaxis_title='error')
     fig.write_image(f'{OUTPUT_DIR}axes_estimation_error_{title}.png')
+    print(f'Mean estimation error for {title} algorithm is {np.mean(norm_error)}')
+
 
 
 def plot_angle_error(ground_truth_matrices, estimation_mats, title, keyframes_list):
@@ -309,7 +311,7 @@ def plot_relative_estimation_error_in_sequences(title_model, title_error_type, l
     plt.legend()
     fig.savefig(f'{OUTPUT_DIR}{title_model}_{title_error_type}_relative_estimation_error_in_seq.png')
     plt.close(fig)
-    print(f"Relative {title_model} estimation error - Avarege {title_error_type} error of all the sequences: {round(avg, 4)}")
+    print(f"Relative {title_model} estimation error - Average {title_error_type} error of all the sequences: {round(avg, 4)}")
 
 
 def plot_links_num_per_distance(pnp_distances, pnp_links_num_per_distance, ba_distances, ba_links_num_per_distance):
@@ -360,9 +362,9 @@ if __name__ == '__main__':
     print("starting loop closure")
     loop_closure = LoopClosure(db, pose_graph, threshold_close=500,
                                threshold_inliers_rel=0.4)
-    full_cov_before_LC = np.array(pose_graph.get_covraince_all_poses())
+    full_cov_before_LC = np.array(pose_graph.get_covariance_all_poses())
     loops_dict = loop_closure.find_loops(OUTPUT_DIR, plot=False)
-    full_cov_after_LC = np.array(pose_graph.get_covraince_all_poses())
+    full_cov_after_LC = np.array(pose_graph.get_covariance_all_poses())
     loop_closure_poses = pose_graph.get_global_keyframes_poses()  # dict
     loop_closure_mats = from_gtsam_poses_to_world_coordinates_mats(loop_closure_poses)
     loop_closure_locations = BundleAdjustment.from_poses_to_locations(loop_closure_poses)
