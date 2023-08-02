@@ -7,21 +7,19 @@ import numpy as np
 K, m_left, m_right = utils.read_cameras()
 INDENTATION_RIGHT_CAM_MAT = m_right[0][3]
 
-
-def read_match_and_straighten(frame_id):
-    img_left, img_right = utils.read_images(frame_id)
-    kp_left, des_left, kp_right, des_right = utils.detect_and_compute(img_left, img_right)
-    matches = utils.find_matches(des_left, des_right)
-    kp_left, des_left, kp_right, des_right, _ = \
-        utils.get_correlated_kps_and_des_from_matches(kp_left, des_left, kp_right, des_right, matches)
-    kp_left, des_left, kp_right, des_right = \
-        utils.rectified_stereo_pattern_test(kp_left, des_left, kp_right, des_right, 2)
-    kp_left = [kp.pt for kp in kp_left]
-    kp_right = [kp.pt for kp in kp_right]
-    return np.array(kp_left), np.array(des_left), np.array(kp_right), np.array(des_right)
-
+"""
+This File Enable to run PnP RANSAC between any 2 frames 
+(the DB RANSAC allows to run only between 2 consecutive frames)
+"""
 
 def RANSAC(first_frame_id, second_frame_id):
+    """
+    Enable to run PnP RANSAC between any 2 frames (the DD RANSAC allows to run only between 2 consecutive frames)
+    :param first_frame_id:
+    :param second_frame_id:
+    :return: extrinsic camera mat second frame left, inliers matches, outliers matches,
+    kp lists (for each frame, for left and right), the kp list of each frame are correlated by the matches
+    """
     kp_left_first, des_left_first, kp_right_first, des_right_first = read_match_and_straighten(first_frame_id)
     kp_left_second, des_left_second, kp_right_second, des_right_second = read_match_and_straighten(second_frame_id)
     matches = utils.find_matches(des_left_first, des_left_second)
@@ -80,12 +78,47 @@ def RANSAC(first_frame_id, second_frame_id):
         kp_left_first, kp_right_first, kp_left_second, kp_right_second
 
 
+#### RANSAC Helpers ####
+
+def read_match_and_straighten(frame_id):
+    """
+    read right and left image, find features and matches
+    :param frame_id:
+    :return: kp lists (eft and right), the kp list of each frame are correlated by the matches
+    """
+    img_left, img_right = utils.read_images(frame_id)
+    kp_left, des_left, kp_right, des_right = utils.detect_and_compute(img_left, img_right)
+    matches = utils.find_matches(des_left, des_right)
+    kp_left, des_left, kp_right, des_right, _ = \
+        utils.get_correlated_kps_and_des_from_matches(kp_left, des_left, kp_right, des_right, matches)
+    kp_left, des_left, kp_right, des_right = \
+        utils.rectified_stereo_pattern_test(kp_left, des_left, kp_right, des_right, 2)
+    kp_left = [kp.pt for kp in kp_left]
+    kp_right = [kp.pt for kp in kp_right]
+    return np.array(kp_left), np.array(des_left), np.array(kp_right), np.array(des_right)
+
+
+
 def _get_3d_pt(left_pixel, right_pixel):
+    """
+    given pixels of a match (left and right pixels), return the 3d point, in the camera frame coordinate
+    :param left_pixel:
+    :param right_pixel:
+    :return: 3d point
+    """
     pt_4d = utils.triangulation_single_match(K @ m_left, K @ m_right, left_pixel, right_pixel)
     return pt_4d[:3] / pt_4d[3]
 
-
 def _sample_4_points(kp_left_first, kp_right_first, kp_left_second, matches):
+    """
+    sample randomly 4 matches between the left-first-frame and left-second-frame,
+    :param kp_left_first:
+    :param kp_right_first:
+    :param kp_left_second:
+    :param matches:
+    :return: points_2d - the pixels of the matches in left-second-frame image
+    points_3d - the 3d points of the matches in left-first-frame coordinate system
+    """
     rand_idxs = random.sample(range(len(matches)), 4)
     points_3d = np.empty((4, 3))
     points_2d = np.empty((4, 2))
@@ -99,6 +132,21 @@ def _sample_4_points(kp_left_first, kp_right_first, kp_left_second, matches):
 def _find_supporters(matches, kp_left_first, kp_right_first, kp_left_second, kp_right_second,
                      extrinsic_camera_mat_second_frame_left,
                      extrinsic_camera_mat_second_frame_right):
+    """
+     Given extrinsic camera matrices of a frame (right and left mats), and matches, return indexes of all the
+        matches that are supporters. means, the distance from the pixel to the projected pixel
+        (after making triangulation and finding the 3d point), is not bigger than a threshold.
+    :param matches: list of matches between key-points in first frame, to key-points in second frame. each match is
+        a tuple: (idx of kp in first frame, idx of kp in second frame)
+    :param kp_left_first:
+    :param kp_right_first:
+    :param kp_left_second:
+    :param kp_right_second:
+    :param extrinsic_camera_mat_second_frame_left: second frame extrinsic left camera matrix, represents the relative
+        motion from first to second frame.
+    :param extrinsic_camera_mat_second_frame_right: second frame extrinsic right camera matrix
+    :return: indices of all matches from matches list that are supporters
+    """
     idxs_supports_matches = []
     idxs_unsupports_matches = []
     for i in range(len(matches)):
