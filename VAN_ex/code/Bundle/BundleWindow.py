@@ -8,6 +8,7 @@ from gtsam.utils import plot
 
 CAMERA_SYMBOL = 'c'
 POINT_SYMBOL = 'q'
+MAX_Z_VALUE = 100
 
 
 class BundleWindow:
@@ -149,7 +150,7 @@ class BundleWindow:
             pt_3d = last_frame_stereo_cam.backproject(pt_2d)
 
             # filter points with negative or too big z value
-            if pt_3d[2] <= 0 or pt_3d[2] >= 100:
+            if pt_3d[2] <= 0 or pt_3d[2] >= MAX_Z_VALUE:
                 continue
             else:
                 values.insert(gtsam.symbol(POINT_SYMBOL, track_id), pt_3d)

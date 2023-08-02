@@ -213,6 +213,15 @@ def calc_max_iterations(p, eps, size):
 
 
 def estimate_second_frame_mats_pnp(points_2d, points_3d, identation_right_cam_mat, K, flag=cv.SOLVEPNP_P3P):
+    """
+    solve PnP
+    :param points_2d: np array in shape (x,2) each row is a pixel on left image of second frame
+    :param points_3d: np array in shape (x,3) each row is a 3d point in coordinates of first frame, left camera.
+    :param identation_right_cam_mat:
+    :param K: intrinsic camera matrix
+    :param flag: wich version of pnp to solve
+    :return: right and left extrinsic camera matrices of second frame
+    """
     dist_coeffs = np.zeros((4, 1))
     success, rotation_vector, translation_vector = cv.solvePnP(points_3d, points_2d, K, dist_coeffs, flags=flag)
     if success == 0:
