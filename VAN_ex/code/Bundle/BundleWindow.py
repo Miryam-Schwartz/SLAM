@@ -334,7 +334,7 @@ class BundleWindow:
                 value is list of errors in left cameras
         :param projection_error_right: same as above, for right cameras
         """
-        random_track_ids = random.sample(self._tracks, 200)
+        random_track_ids = random.sample(self._tracks, 8)
         for track_id in random_track_ids:
             pt_3d = self._current_values.atPoint3(gtsam.symbol(POINT_SYMBOL, track_id))
             track_obj = self._db.get_track_obj(track_id)

@@ -68,7 +68,7 @@ def plot_bundle_error_before_after_opt(keyframes_list, mean_factor_error_before,
 
 
 def PnP_median_projection_error_per_distance(pnp_mats):
-    random_track_ids = random.sample(range(db.get_tracks_number()), 500)
+    random_track_ids = random.sample(range(db.get_tracks_number()), 1000)
     # left_camera_mats_in_world_coordinates = db.get_left_camera_mats_in_world_coordinates()
     # key = distance from last frame of track, value = list of projection errors (from different tracks)
     right_projection_err = dict()

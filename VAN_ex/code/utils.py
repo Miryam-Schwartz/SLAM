@@ -1,7 +1,6 @@
 import cv2 as cv
 import gtsam
 import numpy as np
-# from matplotlib import pyplot as plt
 import plotly.express as px
 import plotly.graph_objs as go
 from matplotlib import pyplot as plt
