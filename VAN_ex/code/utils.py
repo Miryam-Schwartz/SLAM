@@ -75,6 +75,10 @@ def find_matches(des1, des2):
 
 
 def read_cameras():
+    """
+    read the kiti cameras data
+    :return:
+    """
     with open(DATA_PATH + 'calib.txt') as f:
         l1 = f.readline().split()[1:]  # skip first token
         l2 = f.readline().split()[1:]  # skip first token
@@ -116,6 +120,16 @@ def difference_y_axis_between_two_kps(single_kp1, single_kp2):
 
 
 def rectified_stereo_pattern_test(kp1, des1, kp2, des2, threshold=1):
+    """
+    apply the rectified test over matches between left and right stereo images
+    assuming that kp1, kp2 are index correlated by thier matches
+    :param kp1:
+    :param des1:
+    :param kp2:
+    :param des2:
+    :param threshold:
+    :return:
+    """
     img1_inliers_kps, img1_inliers_des, img2_inliers_kps, img2_inliers_des = [], [], [], []
     for i in range(len(kp1)):
         if difference_y_axis_between_two_kps(kp1[i], kp2[i]) < threshold:
@@ -167,6 +181,14 @@ def triangulation_list_of_points(kp1, kp2, triangulation_func=triangulation_sing
 
 def match_and_triangulate_image(im_idx, rectified_test=False,
                                 triangulation_func=triangulation_single_match, threshold=1):
+    """
+    find matches in frame, between left and right and by triangulation find the 3d point
+    :param im_idx:
+    :param rectified_test:
+    :param triangulation_func:
+    :param threshold:
+    :return:
+    """
     img1, img2 = read_images(im_idx)
     kp1, des1, kp2, des2 = detect_and_compute(img1, img2)
     matches = find_matches(des1, des2)
@@ -178,6 +200,15 @@ def match_and_triangulate_image(im_idx, rectified_test=False,
 
 
 def get_correlated_kps_and_des_from_matches(kp1, des1, kp2, des2, matches):
+    """
+    arrange the kp and des of image1 and image2 such that the index of matches kp are identical
+    :param kp1:
+    :param des1:
+    :param kp2:
+    :param des2:
+    :param matches:
+    :return:
+    """
     kp1_ret, kp2_ret = [], []
     des1_ret, des2_ret = [], []
     dict_left_to_right = dict()
@@ -191,6 +222,15 @@ def get_correlated_kps_and_des_from_matches(kp1, des1, kp2, des2, matches):
 
 
 def show_dots_3d_cloud(arrays_of_dots_3d, names_of_arrays, colors, output_name, show=False):
+    """
+    plot 3d points cloud
+    :param arrays_of_dots_3d:
+    :param names_of_arrays:
+    :param colors:
+    :param output_name:
+    :param show:
+    :return: None
+    """
     fig = go.Figure(
         go.Scatter3d(x=[0], y=[0], z=[0], mode='markers', marker=dict(size=5, color='yellow'), name='camera'))
     for i in range(len(arrays_of_dots_3d)):
@@ -208,6 +248,13 @@ def show_dots_3d_cloud(arrays_of_dots_3d, names_of_arrays, colors, output_name, 
 
 
 def calc_max_iterations(p, eps, size):
+    """
+    used for RANSAC
+    :param p:
+    :param eps:
+    :param size:
+    :return:
+    """
     return np.log(1 - p) / np.log(1 - np.power(1 - eps, size))
 
 
@@ -232,17 +279,39 @@ def estimate_second_frame_mats_pnp(points_2d, points_3d, identation_right_cam_ma
 
 
 def rodriguez_to_mat(rvec, tvec):
+    """
+    Switch between the different representations of a camera matrix
+    :param rvec:
+    :param tvec:
+    :return:
+    """
     rot, _ = cv.Rodrigues(rvec)
     return np.hstack((rot, tvec))
 
 
 def project_3d_pt_to_pixel(k, extrinsic_camera_mat, pt_3d):
+    """
+    project 3d point on the camera with extrinsic_camera_mat mat
+    :param k:
+    :param extrinsic_camera_mat:
+    :param pt_3d:
+    :return:
+    """
     pt_3d_h = np.append(pt_3d, [1])
     projected = k @ extrinsic_camera_mat @ pt_3d_h
     return projected[0:2] / projected[2]
 
 
 def create_hist(data_array, x_label, y_label, title, output_path):
+    """
+    create any hitogram
+    :param data_array:
+    :param x_label:
+    :param y_label:
+    :param title:
+    :param output_path:
+    :return:
+    """
     fig = plt.figure()
     plt.hist(data_array)
     plt.xlabel(x_label)
@@ -252,6 +321,11 @@ def create_hist(data_array, x_label, y_label, title, output_path):
 
 
 def read_ground_truth_matrices(path=GROUND_TRUTH_PATH):
+    """
+    read ground truth_matrices from disk
+    :param path:
+    :return:
+    """
     matrices = []
     with open(path) as f:
         for line in f:
@@ -262,6 +336,11 @@ def read_ground_truth_matrices(path=GROUND_TRUTH_PATH):
 
 
 def calculate_ground_truth_locations_from_matrices(ground_truth_matrices):
+    """
+    calculate ground truth_locations from given relative matrices
+    :param ground_truth_matrices:
+    :return: locations in world coordinates system
+    """
     locations = []
     for mat in ground_truth_matrices:
         pos = ((-(mat[:, :3]).T @ mat[:, 3]).reshape(1, 3))[0]
@@ -271,6 +350,13 @@ def calculate_ground_truth_locations_from_matrices(ground_truth_matrices):
 
 
 def show_localization(estimated_locations, ground_truth_locations, output_path, title='Estimated vs Real localization'):
+    """
+    plot location of both GT and Estimation
+    :param estimated_locations:
+    :param ground_truth_locations:
+    :param output_path:
+    :param title:
+    """
     fig, ax = plt.subplots()
     if ground_truth_locations is not None:
         ax.scatter(x=ground_truth_locations[:, 0], y=ground_truth_locations[:, 2],
@@ -293,12 +379,28 @@ def invert_extrinsic_matrix(r_mat, t_vec):
 
 
 def get_stereo_point2(db, frame_id, kp_idx):
+    """
+    get stereo point2 (Gtsam object) for feature
+    :param db:
+    :param frame_id:
+    :param kp_idx:
+    :return:
+    """
     left_pixel, right_pixel = db.get_frame_obj(frame_id).get_feature_pixels(kp_idx)
     x_l, x_r, y = left_pixel[0], right_pixel[0], (left_pixel[1] + right_pixel[1]) / 2
     return gtsam.StereoPoint2(x_l, x_r, y)
 
 
 def keyframes_localization_error(alg, global_locations, ground_truth_locations, initial_estimate, output_path):
+    """
+    compute localization error
+    :param alg:
+    :param global_locations:
+    :param ground_truth_locations:
+    :param initial_estimate:
+    :param output_path:
+    :return:
+    """
     keyframes = alg.get_keyframes()
     keyframe_localization_error = np.sum((ground_truth_locations[keyframes] - global_locations) ** 2, axis=-1) ** 0.5
     initial_estimate_error = np.sum((ground_truth_locations[keyframes] - initial_estimate) ** 2,
